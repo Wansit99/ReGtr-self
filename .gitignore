@@ -4,4 +4,4 @@ data/
 events*
 debug*
 log*
-*.cpython
+*.pyc

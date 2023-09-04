@@ -90,11 +90,17 @@ class Trainer:
             # validation interval given in epochs, so convert to steps
             self.opt.validate_every = -self.opt.validate_every * len(train_loader)
             self.logger.info('Validation interval set to {} steps'.format(self.opt.validate_every))
+            print("local_rank {} is enter barrier:".format(local_rank))
+            dist.barrier()
+            print("local_rank {} is out barrier:".format(local_rank))
 
         # Run validation and exit if validate_every = 0
         if self.opt.validate_every == 0:
             if local_rank == 0:
                 self._run_validation(model, val_loader, step=global_step, save_ckpt=False, rank = local_rank)
+                print("local_rank {} is enter barrier:".format(local_rank))
+                dist.barrier()
+                print("local_rank {} is out barrier:".format(local_rank))
             return
 
         # Validation dry run for sanity checks
@@ -102,6 +108,9 @@ class Trainer:
             if local_rank == 0:
                 self._run_validation(model, val_loader, step=global_step,
                                  limit_steps=self.opt.nb_sanity_val_steps)
+                print("local_rank {} is enter barrier:".format(local_rank))
+                dist.barrier()
+                print("local_rank {} is out barrier:".format(local_rank))
 
         # Main training loop
         while not done:  # Loop over epochs
