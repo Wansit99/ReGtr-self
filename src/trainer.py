@@ -93,11 +93,19 @@ class Trainer:
             print("local_rank {} is enter barrier:".format(local_rank))
             dist.barrier()
             print("local_rank {} is out barrier:".format(local_rank))
+        else:
+            print("local_rank {} is enter barrier:".format(local_rank))
+            dist.barrier()
+            print("local_rank {} is out barrier:".format(local_rank))
 
         # Run validation and exit if validate_every = 0
         if self.opt.validate_every == 0:
             if local_rank == 0:
                 self._run_validation(model, val_loader, step=global_step, save_ckpt=False, rank = local_rank)
+                print("local_rank {} is enter barrier:".format(local_rank))
+                dist.barrier()
+                print("local_rank {} is out barrier:".format(local_rank))
+            else:
                 print("local_rank {} is enter barrier:".format(local_rank))
                 dist.barrier()
                 print("local_rank {} is out barrier:".format(local_rank))
@@ -108,6 +116,10 @@ class Trainer:
             if local_rank == 0:
                 self._run_validation(model, val_loader, step=global_step,
                                  limit_steps=self.opt.nb_sanity_val_steps)
+                print("local_rank {} is enter barrier:".format(local_rank))
+                dist.barrier()
+                print("local_rank {} is out barrier:".format(local_rank))
+            else:
                 print("local_rank {} is enter barrier:".format(local_rank))
                 dist.barrier()
                 print("local_rank {} is out barrier:".format(local_rank))
@@ -192,8 +204,7 @@ class Trainer:
                         print("local_rank {} is enter barrier save:".format(local_rank))
                         dist.barrier()
                         print("local_rank {} is out barrier save:".format(local_rank))
-
-                    if local_rank == 0:
+                    else:
                         self._run_validation(model, val_loader, step=global_step)
                         tbar = tqdm(total=len(train_loader), ncols=80, initial=batch_idx+1,
                                     desc=tbar.desc[:-2])
