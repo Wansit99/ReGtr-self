@@ -58,6 +58,7 @@ local_rank = opt.local_rank
 # DDP：DDP backend初始化
 torch.cuda.set_device(local_rank)
 dist.init_process_group(backend='nccl')  # nccl是GPU设备上最快、最推荐的后端
+dist.barrier()
 
 # Override config if --resume is passed
 if opt.config is None:

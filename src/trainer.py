@@ -58,9 +58,14 @@ class Trainer:
 
         # Initialize checkpoint manager and resume from checkpoint if necessary
         if self.opt.resume is not None:
+            
             first_step = global_step = \
                 self.saver.load(self.opt.resume, model,
                                 optimizer=model.optimizer, scheduler=model.scheduler)
+            print("local_rank {} is enter barrier:".format(local_rank))
+            dist.barrier()
+            print("local_rank {} is out barrier:".format(local_rank))
+            
         else:
             first_step = global_step = 0
         # Configure anomaly detection
@@ -110,7 +115,7 @@ class Trainer:
             torch.set_grad_enabled(True)
             model.module.train_epoch_start()
             t_epoch_start = time.perf_counter()
-
+            
             for batch_idx, batch in enumerate(train_loader):
 
                 global_step += 1
@@ -174,11 +179,20 @@ class Trainer:
                     # Run validation, and save checkpoint.
                     # if dist.get_rank() == 0:
                     #     torch.save(model.module.state_dict(), "%d.ckpt" % epoch)
+                    if local_rank != 0:
+                        print("local_rank {} is enter barrier save:".format(local_rank))
+                        dist.barrier()
+                        print("local_rank {} is out barrier save:".format(local_rank))
+
                     if local_rank == 0:
                         self._run_validation(model, val_loader, step=global_step)
                         tbar = tqdm(total=len(train_loader), ncols=80, initial=batch_idx+1,
                                     desc=tbar.desc[:-2])
-
+                        print("local_rank {} is enter barrier save:".format(local_rank))
+                        dist.barrier()
+                        print("local_rank {} is out barrier save:".format(local_rank))
+                    
+                    
                 if global_step - first_step >= total_iter:
                     done = True
                     break

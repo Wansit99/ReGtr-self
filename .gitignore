@@ -1,2 +1,7 @@
 *.pth
 data/
+*.0
+events*
+debug*
+log*
+*.cpython
