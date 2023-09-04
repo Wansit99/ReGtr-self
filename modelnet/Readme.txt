@@ -1,0 +1,1 @@
+From ModelNet/220222_080719_regtr_regressCoor_400epochs/model-481806.pth

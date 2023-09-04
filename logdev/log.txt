@@ -1,0 +1,29 @@
+09/04 12:17:33 [INFO] root - Output and logs will be saved to ../logdev
+09/04 12:17:33 [INFO] cvhelpers.misc - Command: test.py --dev --resume /home/ubuntu/Downloads/RegTR-main-ddp/logs/3dmatch/230903_101452_regtr_regressCoor/ckpt/model-131776-0.3166.pth --benchmark 3DMatch
+09/04 12:17:33 [INFO] cvhelpers.misc - Arguments: benchmark: 3DMatch, config: None, logdir: ../logs, dev: True, name: None, num_workers: 0, resume: /home/ubuntu/Downloads/RegTR-main-ddp/logs/3dmatch/230903_101452_regtr_regressCoor/ckpt/model-131776-0.3166.pth
+09/04 12:17:33 [INFO] root - Using config file from checkpoint directory: /home/ubuntu/Downloads/RegTR-main-ddp/logs/3dmatch/230903_101452_regtr_regressCoor/config.yaml
+09/04 12:17:33 [INFO] data_loaders.threedmatch - Loading data from ../data/indoor
+09/04 12:17:33 [INFO] RegTR - Instantiating model RegTR
+09/04 12:17:38 [INFO] RegTR - Loss weighting: {'overlap_5': 1.0, 'feature_5': 0.1, 'corr_5': 1.0, 'feature_un': 0.0}
+09/04 12:17:38 [INFO] RegTR - Config: d_embed:256, nheads:8, pre_norm:True, use_pos_emb:True, sa_val_has_pos_emb:True, ca_val_has_pos_emb:True
+09/04 12:17:38 [INFO] CheckPointManager - Loaded models from /home/ubuntu/Downloads/RegTR-main-ddp/logs/3dmatch/230903_101452_regtr_regressCoor/ckpt/model-131776-0.3166.pth
+09/04 12:24:14 [INFO] RegTR - Aggregating metrics, total number of instances: 1623
+09/04 12:24:14 [INFO] RegTR - Test ended:
+[Losses] corr_5: 0.3178, feature_5: 1.13, feature_un: 74.49, overlap_5: 0.3444, total: 0.7753
+[Metrics] reg_success_0: 0, reg_success_1: 0.001848, reg_success_2: 0.02157, reg_success_3: 0.08811, reg_success_4: 0.2717, reg_success_final: 0.7184, rot_err_deg_0: 145.5, rot_err_deg_1: 91.35, rot_err_deg_2: 23.45, rot_err_deg_3: 14.53, rot_err_deg_4: 10.27, rot_err_deg_final: 6.649, trans_err_0: 2.862, trans_err_1: 2.148, trans_err_2: 0.6801, trans_err_3: 0.4214, trans_err_4: 0.2962, trans_err_final: 0.195
+
+09/04 12:24:15 [INFO] RegTR - 
+Scene	¦ prec.	¦ rec.	¦ re	¦ te	¦ samples	¦
+Kitchen	¦ 0.935	¦ 0.935	¦ 2.096	¦ 0.056	¦ 449¦
+Home 1	¦ 0.840	¦ 0.840	¦ 1.551	¦ 0.052	¦ 106¦
+Home 2	¦ 0.736	¦ 0.736	¦ 2.801	¦ 0.090	¦ 159¦
+Hotel 1	¦ 0.945	¦ 0.945	¦ 2.037	¦ 0.070	¦ 182¦
+Hotel 2	¦ 0.923	¦ 0.923	¦ 2.179	¦ 0.066	¦  78¦
+Hotel 3	¦ 1.000	¦ 1.000	¦ 2.839	¦ 0.051	¦  26¦
+Study	¦ 0.825	¦ 0.825	¦ 2.106	¦ 0.078	¦ 234¦
+MIT Lab	¦ 0.844	¦ 0.844	¦ 2.054	¦ 0.087	¦  45¦
+Mean precision: 0.881: +- 0.079
+Weighted precision: 0.881
+Mean median RRE: 2.208: +- 0.397
+Mean median RTE: 0.069: +- 0.014
+
