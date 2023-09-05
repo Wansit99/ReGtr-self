@@ -27,13 +27,13 @@ solver:
     # 目前0.000125最好 / 3.10
     # 0.000125 /3.14
     # 0.0001 前几个epoch收敛最快，目前实验减少了多头注意力数量8->4
-    base_lr: 0.0000125 # 0.0000125 # 0.000003125 # 0.00000625 # 0.0000075 # 0.00005  # 0.000003125
+    base_lr: 0.0001 # 0.0000125 # 0.000003125 # 0.00000625 # 0.0000075 # 0.00005  # 0.000003125
     # weight_decay 要与base_lr同步增长或降低
     # 目前0.00015最好
     weight_decay: 0.0001
     grad_clip: 0.1
     scheduler: 'step'
-    scheduler_param: [51470, 0.707]  # Decay by 0.707 every 10 epochs,  Decay by 0.5 every 20 epochs
+    scheduler_param: [205860, 0.5]  # Decay by 0.707 every 10 epochs,  Decay by 0.5 every 20 epochs
 
 
 # Use the same processing or backbone as Predator
@@ -70,7 +70,8 @@ kpconv_options:
                    'resnetb',
                    'resnetb'] # 10
     use_att_in_backbone: True
-    att_add_pos: [6,7,9,10]
+    att_add_pos: [7,10]
+    head: 4
 
 model:
     model: regtr.RegTR

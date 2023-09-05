@@ -664,7 +664,7 @@ class ResnetBottleneckBlock(nn.Module):
         self.use_att = use_att
         if use_att:
             self.relu = nn.ReLU()
-            self.attention = nn.MultiheadAttention(out_dim, 1, 0.0)
+            self.attention = nn.MultiheadAttention(out_dim, config.head, 0.0)
             self.k1 = nn.Parameter(torch.tensor(0.0))
             # self.k2 = nn.Parameter(torch.tensor(0.0))
             self.sigmoid = nn.Sigmoid()
