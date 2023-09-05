@@ -56,25 +56,28 @@ class Trainer:
        
         
 
+        
+        
+        # DDP: 构造DDP model
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(local_rank)
+        model = DDP(model, device_ids=[local_rank], output_device=local_rank)
+        model.module.configure_optimizers()
+
         # Initialize checkpoint manager and resume from checkpoint if necessary
         if self.opt.resume is not None:
             
             first_step = global_step = \
                 self.saver.load(self.opt.resume, model,
-                                optimizer=model.optimizer, scheduler=model.scheduler)
+                                optimizer=model.module.optimizer, scheduler=model.module.scheduler)
             print("local_rank {} is enter barrier:".format(local_rank))
             dist.barrier()
             print("local_rank {} is out barrier:".format(local_rank))
             
         else:
             first_step = global_step = 0
+            
         # Configure anomaly detection
         torch.autograd.set_detect_anomaly(self.opt.debug)
-        
-        # DDP: 构造DDP model
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(local_rank)
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank)
-        model.module.configure_optimizers()
 
         torch.cuda.set_device(local_rank)
         torch.cuda.empty_cache()
@@ -322,7 +325,7 @@ class Trainer:
 
         if save_ckpt:
             self.saver.save(model, step, val_score,
-                            model.module.optimizer, model.module.scheduler)
+                            optimizer = model.module.optimizer, scheduler = model.module.scheduler)
 
         model.train()
 
