@@ -130,7 +130,7 @@ class CheckPointManager(object):
             self._save_path = None
             self._checkpoints_fname = None
 
-    def _save_checkpoint(self, step, model, score, **kwargs):
+    def _save_checkpoint(self, step, model, score, *kwargs):
          # 使用*作为通配符来匹配得分部分
         matching_files = glob.glob(self._save_path.format(step, '*'))
     
@@ -146,14 +146,21 @@ class CheckPointManager(object):
 
         save_name = self._save_path.format(step, score)
 
+        optimizer = kwargs[0]
+        scheduler = kwargs[1]
+
         model_state_dict = {k: v for (k, v) in model.module.state_dict().items() if not v.is_sparse}
+        optimizer_state_dict = optimizer.state_dict()
+        scheduler_state_dict = scheduler.state_dict()
         state = {'state_dict': model_state_dict,
-                 'step': step}
-        for k in kwargs:
-            if getattr(kwargs[k], 'state_dict', None) is not None:
-                state[k] = kwargs[k].state_dict()
-            else:
-                state[k] = kwargs[k]  # Note that loading of this variable is not supported
+                 'step': step,
+                 'optimizer': optimizer_state_dict,
+                 'scheduler': scheduler_state_dict}
+        # for k in kwargs:
+        #     if getattr(kwargs[k], 'state_dict', None) is not None:
+        #         state[k] = kwargs[k].state_dict()
+        #     else:
+        #         state[k] = kwargs[k]  # Note that loading of this variable is not supported
 
         torch.save(state, save_name)
         self._logger.info('Saved checkpoint: {}'.format(save_name))
@@ -192,7 +199,7 @@ class CheckPointManager(object):
 
 
     def save(self, model: torch.nn.Module, step: int, score: float = 0.0,
-             **kwargs):
+             *kwargs):
         """Save model checkpoint to file
 
         Args:
@@ -201,10 +208,11 @@ class CheckPointManager(object):
             score (float, optional): To determine which model is the best (i.e. highest score)
             **kwargs: For saving arbitrary data, e.g. for optimizer or scheduler.
         """
+        
         if self._save_path is None:
             raise AssertionError('Checkpoint manager must be initialized with save path for save().')
 
-        self._save_checkpoint(step, model, score, **kwargs)
+        self._save_checkpoint(step, model, score, *kwargs)
         # self._remove_old_checkpoints()
         self._update_checkpoints_file()
 

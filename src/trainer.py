@@ -165,6 +165,7 @@ class Trainer:
                                 # print("optimizer is True")
                                 model.module.optimizer.step()
                                 model.module.scheduler.step()
+                                # print(model.module.optimizer.state_dict()['param_groups'][0]['lr'])
 
                     # Increment counters
                     for k in losses:
@@ -321,7 +322,7 @@ class Trainer:
 
         if save_ckpt:
             self.saver.save(model, step, val_score,
-                            optimizer=model.module.optimizer, scheduler=model.module.scheduler)
+                            model.module.optimizer, model.module.scheduler)
 
         model.train()
 
