@@ -59,7 +59,7 @@ class Trainer:
         
         
         # DDP: 构造DDP model
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(local_rank)
+        # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(local_rank)
         model = DDP(model, device_ids=[local_rank], output_device=local_rank)
         model.module.configure_optimizers()
 
