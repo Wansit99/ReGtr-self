@@ -131,11 +131,22 @@ class TransformerCrossEncoderLayer(nn.Module):
         # Self attention
         src_w_pos = self.with_pos_embed(src, src_pos)
         q = k = src_w_pos
+        
+        # output, attn_weights = self.self_attn(query, key, value, 
+                                    #  key_padding_mask=key_padding_mask, 
+                                    #  attn_mask=attn_mask)
+        # query, key, value: 这些都是你要输入的主要张量。在自注意力的情境下，它们通常都是同一个张量，但在其他情况（如编码器-解码器注意力）中，它们可能是不同的。
+        # 可选， 如果不给，则默认所有位置参与计算
+        # key_padding_mask: 一个布尔掩码，用于指定哪些条目不应被考虑（例如，因为它们是填充的）。
+        # 可选， 如果不给，则默认所有位置参与计算
+        # attn_mask: 一个掩码，用于阻止某些位置参与注意力计算。例如，在解码器中，为了确保输出位置只注意前面的位置，你可能会使用这个。
         src2, satt_weights_s = self.self_attn(q, k,
                               value=src_w_pos if self.sa_val_has_pos_emb else src,
                               attn_mask=src_mask,
                               key_padding_mask=src_key_padding_mask)
+        # 做残差
         src = src + self.dropout1(src2)
+        # 在normal一下
         src = self.norm1(src)
 
         tgt_w_pos = self.with_pos_embed(tgt, tgt_pos)
@@ -191,53 +202,89 @@ class TransformerCrossEncoderLayer(nn.Module):
         assert src_mask is None and tgt_mask is None, 'Masking not implemented'
 
         # Self attention
+        
+        # LayerNorm
         src2 = self.norm1(src)
+        # 点云特征+位置编码
         src2_w_pos = self.with_pos_embed(src2, src_pos)
+        # 得到q,k
         q = k = src2_w_pos
+        
+        # output, attn_weights = self.self_attn(query, key, value, 
+                                    #  key_padding_mask=key_padding_mask, 
+                                    #  attn_mask=attn_mask)
+        # output: 经过多头注意力处理后的张量。
+        # attn_weights: 表示注意力权重的张量，可用于分析或可视化。
+        
+        # query, key, value: 这些都是你要输入的主要张量。在自注意力的情境下，它们通常都是同一个张量，但在其他情况（如编码器-解码器注意力）中，它们可能是不同的。
+        # 可选， 如果不给，则默认所有位置参与计算
+        # key_padding_mask: 一个布尔掩码，用于指定哪些条目不应被考虑（例如，因为它们是填充的）。
+        # 可选， 如果不给，则默认所有位置参与计算
+        # attn_mask: 一个掩码，用于阻止某些位置参与注意力计算。例如，在解码器中，为了确保输出位置只注意前面的位置，你可能会使用这个。
         src2, satt_weights_s = self.self_attn(q, k,
+                                              # 自注意力 所以q,k,v全部一样
                                               value=src2_w_pos if self.sa_val_has_pos_emb else src2,
+                                              # 哪些是padding上去的特征
                                               attn_mask=src_mask,
+                                              # 似乎没传递？None？
                                               key_padding_mask=src_key_padding_mask)
+        # 做残差 A+result(A)
         src = src + self.dropout1(src2)
+        
+        # 同上
 
         tgt2 = self.norm1(tgt)
         tgt2_w_pos = self.with_pos_embed(tgt2, tgt_pos)
         q = k = tgt2_w_pos
         tgt2, satt_weights_t = self.self_attn(q, k,
+                                              # v也是q,k一样的？
                                               value=tgt2_w_pos if self.sa_val_has_pos_emb else tgt2,
+                                              # 
                                               attn_mask=tgt_mask,
                                               key_padding_mask=tgt_key_padding_mask)
         tgt = tgt + self.dropout1(tgt2)
 
         # Cross attention
+        # LayerNorm
         src2, tgt2 = self.norm2(src), self.norm2(tgt)
+        # 添加位置编码
         src_w_pos = self.with_pos_embed(src2, src_pos)
         tgt_w_pos = self.with_pos_embed(tgt2, tgt_pos)
 
+        # Q是scr， K，V是tgt
         src3, xatt_weights_s = self.multihead_attn(query=self.with_pos_embed(src2, src_pos),
                                                    key=tgt_w_pos,
                                                    value=tgt_w_pos if self.ca_val_has_pos_emb else tgt2,
                                                    attn_mask=tgt_mask,
                                                    key_padding_mask=tgt_key_padding_mask)
+        # Q是tgt， K, V是src
         tgt3, xatt_weights_t = self.multihead_attn(query=self.with_pos_embed(tgt2, tgt_pos),
                                                    key=src_w_pos,
                                                    value=src_w_pos if self.ca_val_has_pos_emb else src2,
                                                    attn_mask=src_mask,
                                                    key_padding_mask=src_key_padding_mask)
-
+        # 进行dropout
         src = src + self.dropout2(src3)
         tgt = tgt + self.dropout2(tgt3)
 
         # Position-wise feedforward
+        
+        # LayerNorm
         src2 = self.norm3(src)
+        # FFN
         src2 = self.linear2(self.dropout(self.activation(self.linear1(src2))))
+        # A + result(A)
         src = src + self.dropout3(src2)
 
+        # LayerNorm
         tgt2 = self.norm3(tgt)
+        # FFN
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt2))))
+        # A + result(A)
         tgt = tgt + self.dropout3(tgt2)
 
         # Stores the attention weights for analysis, if required
+        # 可视化注意力分析
         self.satt_weights = (satt_weights_s, satt_weights_t)
         self.xatt_weights = (xatt_weights_s, xatt_weights_t)
 
