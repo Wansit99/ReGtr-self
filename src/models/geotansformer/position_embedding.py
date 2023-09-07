@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+
 class PositionEmbeddingCoordsSine(nn.Module):
     """Similar to transformer's position encoding, but generalizes it to
     arbitrary dimensions and continuous coordinates.
