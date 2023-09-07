@@ -48,30 +48,13 @@ def get_dataloader(cfg, phase, num_workers=0):
     batch_size = cfg[f'{phase}_batch_size']
     shuffle = phase == 'train'
 
-    if phase == "test":
-        data_loader = torch.utils.data.DataLoader(
+    data_loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
         collate_fn=collate_pair,
     )
-    # 这样才是在整个验证集上跑 更为准确
-    elif phase == "val":
-        data_loader = torch.utils.data.DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=num_workers,
-        collate_fn=collate_pair,
-        )
-    else:
-        sampler = torch.utils.data.distributed.DistributedSampler(dataset)
-        data_loader = torch.utils.data.DataLoader(dataset, 
-            batch_size=batch_size,
-            num_workers=num_workers,
-            sampler=sampler,
-            collate_fn=collate_pair,)
     return data_loader
 
 

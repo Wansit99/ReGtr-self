@@ -16,10 +16,8 @@ from utils.misc import StatsMeter
 from models.generic_model import GenericModel
 from utils.misc import metrics_to_string
 
-from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
-# from torch.nn.parallel import DistributedDataParallel as DDP
-
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 class Trainer:
     """Generic trainer class. This is inspired from the trainer class in
@@ -39,7 +37,7 @@ class Trainer:
         self.grad_clip = grad_clip
         self.log_path = self.opt.log_path
 
-    def fit(self, model: GenericModel, local_rank, train_loader, val_loader=None):
+    def fit(self, model: GenericModel, train_loader, val_loader=None):
 
         # Setup
         if torch.cuda.is_available():
@@ -47,40 +45,19 @@ class Trainer:
         else:
             device = torch.device('cpu')
             self.logger.warning('Using CPU for training. This can be slow...')
-
-        
-
-        model.to(local_rank)
+        model.to(device)
+        model.configure_optimizers()
         model.set_trainer(self)
-        
-       
-        
-
-        
-        
-        # DDP: 构造DDP model
-        # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(local_rank)
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank)
-        model.module.configure_optimizers()
 
         # Initialize checkpoint manager and resume from checkpoint if necessary
         if self.opt.resume is not None:
-            
             first_step = global_step = \
                 self.saver.load(self.opt.resume, model,
-                                optimizer=model.module.optimizer, scheduler=model.module.scheduler)
-            print("local_rank {} is enter barrier:".format(local_rank))
-            dist.barrier()
-            print("local_rank {} is out barrier:".format(local_rank))
-            
+                                optimizer=model.optimizer, scheduler=model.scheduler)
         else:
             first_step = global_step = 0
-            
         # Configure anomaly detection
         torch.autograd.set_detect_anomaly(self.opt.debug)
-
-        torch.cuda.set_device(local_rank)
-        torch.cuda.empty_cache()
 
         done = False
         epoch = 0
@@ -93,43 +70,20 @@ class Trainer:
             # validation interval given in epochs, so convert to steps
             self.opt.validate_every = -self.opt.validate_every * len(train_loader)
             self.logger.info('Validation interval set to {} steps'.format(self.opt.validate_every))
-            print("local_rank {} is enter barrier:".format(local_rank))
-            dist.barrier()
-            print("local_rank {} is out barrier:".format(local_rank))
-        else:
-            print("local_rank {} is enter barrier:".format(local_rank))
-            dist.barrier()
-            print("local_rank {} is out barrier:".format(local_rank))
 
         # Run validation and exit if validate_every = 0
         if self.opt.validate_every == 0:
-            if local_rank == 0:
-                self._run_validation(model, val_loader, step=global_step, save_ckpt=False, rank = local_rank)
-                print("local_rank {} is enter barrier:".format(local_rank))
-                dist.barrier()
-                print("local_rank {} is out barrier:".format(local_rank))
-            else:
-                print("local_rank {} is enter barrier:".format(local_rank))
-                dist.barrier()
-                print("local_rank {} is out barrier:".format(local_rank))
+            self._run_validation(model, val_loader, step=global_step, save_ckpt=False)
             return
 
         # Validation dry run for sanity checks
         if self.opt.nb_sanity_val_steps > 0:
-            if local_rank == 0:
-                self._run_validation(model, val_loader, step=global_step,
+            self._run_validation(model, val_loader, step=global_step,
                                  limit_steps=self.opt.nb_sanity_val_steps)
-                print("local_rank {} is enter barrier:".format(local_rank))
-                dist.barrier()
-                print("local_rank {} is out barrier:".format(local_rank))
-            else:
-                print("local_rank {} is enter barrier:".format(local_rank))
-                dist.barrier()
-                print("local_rank {} is out barrier:".format(local_rank))
 
         # Main training loop
         while not done:  # Loop over epochs
-            train_loader.sampler.set_epoch(epoch)
+
             self.logger.info('Starting epoch {} (steps {} - {})'.format(
                 epoch, global_step, global_step + len(train_loader)))
             tbar = tqdm(total=len(train_loader), ncols=80, smoothing=0)
@@ -137,9 +91,9 @@ class Trainer:
             # Train
             model.train()
             torch.set_grad_enabled(True)
-            model.module.train_epoch_start()
+            model.train_epoch_start()
             t_epoch_start = time.perf_counter()
-            
+
             for batch_idx, batch in enumerate(train_loader):
 
                 global_step += 1
@@ -147,11 +101,11 @@ class Trainer:
                 # train step
                 try:
                     batch = all_to_device(batch, device)
-                    train_output, losses = model.module.training_step(batch, global_step)
-                    #TODO: 计算得到 loss 与
-                    if model.module.optimizer_handled_by_trainer:
-                        if model.module.optimizer is not None:
-                            model.module.optimizer.zero_grad()
+                    train_output, losses = model.training_step(batch, global_step)
+
+                    if model.optimizer_handled_by_trainer:
+                        if model.optimizer is not None:
+                            model.optimizer.zero_grad()
 
                         # Back propagate, take optimization step
                         if 'total' in losses and losses['total'].requires_grad:
@@ -162,13 +116,11 @@ class Trainer:
                                 losses['total'].backward()
 
                             if self.grad_clip > 0:
-                                torch.nn.utils.clip_grad_norm_(model.module.parameters(), max_norm=self.grad_clip)
+                                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=self.grad_clip)
 
-                            if model.module.optimizer is not None:
-                                # print("optimizer is True")
-                                model.module.optimizer.step()
-                                model.module.scheduler.step()
-                                # print(model.module.optimizer.state_dict()['param_groups'][0]['lr'])
+                            if model.optimizer is not None:
+                                model.optimizer.step()
+                                model.scheduler.step()
 
                     # Increment counters
                     for k in losses:
@@ -194,7 +146,7 @@ class Trainer:
                 # torch.cuda.empty_cache()
 
                 if global_step == first_step + 1 or global_step % self.opt.summary_every == 0:
-                    model.module.train_summary_fn(writer=self.train_writer, step=global_step,
+                    model.train_summary_fn(writer=self.train_writer, step=global_step,
                                            data_batch=batch, train_output=train_output, train_losses=losses)
 
                 if global_step % self.opt.validate_every == 0:
@@ -202,26 +154,15 @@ class Trainer:
                                   # environments (e.g. Pycharm) do not handle stacking well
 
                     # Run validation, and save checkpoint.
-                    # if dist.get_rank() == 0:
-                    #     torch.save(model.module.state_dict(), "%d.ckpt" % epoch)
-                    if local_rank != 0:
-                        print("local_rank {} is enter barrier save:".format(local_rank))
-                        dist.barrier()
-                        print("local_rank {} is out barrier save:".format(local_rank))
-                    else:
-                        self._run_validation(model, val_loader, step=global_step)
-                        tbar = tqdm(total=len(train_loader), ncols=80, initial=batch_idx+1,
-                                    desc=tbar.desc[:-2])
-                        print("local_rank {} is enter barrier save:".format(local_rank))
-                        dist.barrier()
-                        print("local_rank {} is out barrier save:".format(local_rank))
-                    
-                    
+                    self._run_validation(model, val_loader, step=global_step)
+                    tbar = tqdm(total=len(train_loader), ncols=80, initial=batch_idx+1,
+                                desc=tbar.desc[:-2])
+
                 if global_step - first_step >= total_iter:
                     done = True
                     break
 
-            model.module.train_epoch_end()
+            model.train_epoch_end()
             tbar.close()
 
             losses_dict = {k: stats_meter[k].avg for k in stats_meter}
@@ -299,7 +240,7 @@ class Trainer:
         val_out_all = []
         with torch.no_grad():
 
-            model.module.validation_epoch_start()
+            model.validation_epoch_start()
 
             tbar_val = tqdm(total=num_steps, ncols=80, leave=False)
             for val_batch_idx, val_batch in enumerate(val_loader):
@@ -307,13 +248,13 @@ class Trainer:
                     break
 
                 val_batch = all_to_device(val_batch, model.device)
-                val_out = model.module.validation_step(val_batch, val_batch_idx)
+                val_out = model.validation_step(val_batch, val_batch_idx)
                 val_out_all.append(val_out)
                 tbar_val.update(1)
             tbar_val.close()
 
-            val_score, val_outputs = model.module.validation_epoch_end(val_out_all)
-            model.module.validation_summary_fn(self.val_writer, step, val_outputs)
+            val_score, val_outputs = model.validation_epoch_end(val_out_all)
+            model.validation_summary_fn(self.val_writer, step, val_outputs)
 
             log_str = ['Validation ended:']
             if 'losses' in val_outputs:
@@ -325,42 +266,7 @@ class Trainer:
 
         if save_ckpt:
             self.saver.save(model, step, val_score,
-                            optimizer = model.module.optimizer, scheduler = model.module.scheduler)
+                            optimizer=model.optimizer, scheduler=model.scheduler)
 
         model.train()
 
-    def test_single(self, model: GenericModel, test_loader):
-        # Setup
-        if torch.cuda.is_available():
-            device = torch.device('cuda')
-        else:
-            device = torch.device('cpu')
-            self.logger.warning('Using CPU for training. This can be slow...')
-        model.to(device)
-        model.set_trainer(self)
-
-        # Initialize checkpoint manager and resume from checkpoint if necessary
-        if self.opt.resume is not None and len(self.opt.resume) > 0:
-            self.saver.load(self.opt.resume, model)
-        else:
-            self.logger.warning('No checkpoint given. Will perform inference '
-                                'using random weights')
-
-        # Run validation and exit if validate_every = 0
-        # model.eval()
-        test_out_all = []
-        with torch.no_grad():
-
-            model.module.test_epoch_start()
-
-            tbar_test = tqdm(total=len(test_loader), ncols=80, leave=False)
-            for test_batch_idx, test_batch in enumerate(test_loader):
-                test_batch = all_to_device(test_batch, model.device)
-                test_out = model.module.test_step(test_batch, test_batch_idx)
-                test_out_all.append(test_out)
-                tbar_test.update(1)
-            tbar_test.close()
-
-            model.module.test_epoch_end(test_out_all)
-
-        model.train()

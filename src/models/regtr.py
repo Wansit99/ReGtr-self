@@ -90,19 +90,17 @@ class RegTR(GenericRegModel):
         # Losses
         #######################
 
-        local_rank = kwargs.get('local_rank', 0)
-        # print("local_rank: ",local_rank)
-        self.overlap_criterion = nn.BCEWithLogitsLoss().to(local_rank)
+        self.overlap_criterion = nn.BCEWithLogitsLoss()
         if self.cfg.feature_loss_type == 'infonce':
-            self.feature_criterion = InfoNCELossFull(cfg.d_embed, r_p=cfg.r_p, r_n=cfg.r_n).to(local_rank)
-            self.feature_criterion_un = InfoNCELossFull(cfg.d_embed, r_p=cfg.r_p, r_n=cfg.r_n).to(local_rank)
+            self.feature_criterion = InfoNCELossFull(cfg.d_embed, r_p=cfg.r_p, r_n=cfg.r_n)
+            self.feature_criterion_un = InfoNCELossFull(cfg.d_embed, r_p=cfg.r_p, r_n=cfg.r_n)
         elif self.cfg.feature_loss_type == 'circle':
             self.feature_criterion = CircleLossFull(dist_type='euclidean', r_p=cfg.r_p, r_n=cfg.r_n)
             self.feature_criterion_un = self.feature_criterion
         else:
             raise NotImplementedError
 
-        self.corr_criterion = CorrCriterion(metric='mae').to(local_rank)
+        self.corr_criterion = CorrCriterion(metric='mae')
 
         self.weight_dict = {}
         for k in ['overlap', 'feature', 'corr']:

@@ -93,20 +93,14 @@ with open(opt.config, 'r') as in_fid, open(config_out_fname, 'w') as out_fid:
 def main():
     rank = torch.distributed.get_rank()
     setup_seed(rank+1)
+    
     train_loader = get_dataloader(cfg, phase='train', num_workers=opt.num_workers)
-    if rank == 0:
-        val_loader = get_dataloader(cfg, phase='val', num_workers=opt.num_workers)
-    else:
-        val_loader = None
-
-    # torch.cuda.set_device(rank)
-    # torch.cuda.empty_cache()
-
+    val_loader = get_dataloader(cfg, phase='val', num_workers=opt.num_workers)
 
     Model = get_model(cfg.model)
-    model = Model(cfg, local_rank=local_rank)
+    model = Model(cfg)
     trainer = Trainer(opt, niter=cfg.niter, grad_clip=cfg.grad_clip)
-    trainer.fit(model, local_rank, train_loader, val_loader)
+    trainer.fit(model, train_loader, val_loader)
 
 
 if __name__ == '__main__':
