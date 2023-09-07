@@ -12,8 +12,8 @@ from utils.misc import load_config
 import torch
 
 # 新增：
-import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
+# import torch.distributed as dist
+# from torch.nn.parallel import DistributedDataParallel as DDP
 
 
 # def init_seeds(seed = 0, cuda_deterministic= True):
@@ -49,16 +49,16 @@ parser.add_argument('--resume', type=str, help='Checkpoint to resume from')
 parser.add_argument('--nb_sanity_val_steps', type=int, default=2,
                     help='Number of validation sanity steps to run before training.')
 
-# DDP
-parser.add_argument("--local_rank", default=-1, type=int)
+# # DDP
+# parser.add_argument("--local_rank", default=-1, type=int)
 
 opt = parser.parse_args()
-local_rank = opt.local_rank
+# local_rank = opt.local_rank
 
-# DDP：DDP backend初始化
-torch.cuda.set_device(local_rank)
-dist.init_process_group(backend='nccl')  # nccl是GPU设备上最快、最推荐的后端
-dist.barrier()
+# # DDP：DDP backend初始化
+# torch.cuda.set_device(local_rank)
+# dist.init_process_group(backend='nccl')  # nccl是GPU设备上最快、最推荐的后端
+# dist.barrier()
 
 # Override config if --resume is passed
 if opt.config is None:
@@ -91,8 +91,8 @@ with open(opt.config, 'r') as in_fid, open(config_out_fname, 'w') as out_fid:
 
 
 def main():
-    rank = torch.distributed.get_rank()
-    setup_seed(rank+1)
+    # rank = torch.distributed.get_rank()
+    setup_seed(2)
     
     train_loader = get_dataloader(cfg, phase='train', num_workers=opt.num_workers)
     val_loader = get_dataloader(cfg, phase='val', num_workers=opt.num_workers)

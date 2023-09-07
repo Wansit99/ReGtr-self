@@ -3,9 +3,9 @@ import torch
 import torch.nn as nn
 from einops import rearrange
 
-from transformers import SinusoidalPositionalEmbedding
+from models.geotansformer.transformers import SinusoidalPositionalEmbedding
 from typing import Optional
-from factory import build_act_layer, build_dropout_layer
+from models.geotansformer.factory import build_act_layer, build_dropout_layer
 import torch.nn.functional as F
 
 

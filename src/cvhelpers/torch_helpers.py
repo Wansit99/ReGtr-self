@@ -149,7 +149,7 @@ class CheckPointManager(object):
         # optimizer = kwargs[0]
         # scheduler = kwargs[1]
 
-        model_state_dict = {k: v for (k, v) in model.module.state_dict().items() if not v.is_sparse}
+        model_state_dict = {k: v for (k, v) in model.state_dict().items() if not v.is_sparse}
         # optimizer_state_dict = optimizer.state_dict()
         # scheduler_state_dict = scheduler.state_dict()
         state = {'state_dict': model_state_dict,
@@ -248,7 +248,7 @@ class CheckPointManager(object):
         step = state.get('step', 0)
 
         if 'state_dict' in state and model is not None:
-            retval = model.module.load_state_dict(state['state_dict'], strict=False)
+            retval = model.load_state_dict(state['state_dict'], strict=False)
             if len(retval.unexpected_keys) > 0:
                 self._logger.warning('Unexpected keys in checkpoint: {}'.format(
                     retval.unexpected_keys))

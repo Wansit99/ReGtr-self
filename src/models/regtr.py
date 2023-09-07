@@ -53,8 +53,8 @@ class RegTR(GenericRegModel):
         if cfg.use_geotransformer:
             self.transformer_encoder = GeometricTransformer(
             cfg.d_embed,
-            cfg.geotransformer_hidden_dim,
             cfg.geotransformer_output_dim,
+            cfg.geotransformer_hidden_dim,
             cfg.geotransformer_num_heads,
             cfg.geotransformer_blocks,
             cfg.geotransformer_sigma_d,
@@ -62,6 +62,10 @@ class RegTR(GenericRegModel):
             cfg.geotransformer_angle_k,
             reduction_a = cfg.geotransformer_reduction_a,
         )
+            print("using geo!!")
+            print("using geo!!")
+            print("using geo!!")
+            print("using geo!!")
         else:
             encoder_layer = TransformerCrossEncoderLayer(
                 cfg.d_embed, cfg.nhead, cfg.d_feedforward, cfg.dropout,
@@ -173,13 +177,43 @@ class RegTR(GenericRegModel):
         tgt_feats_padded, tgt_key_padding_mask, _ = pad_sequence(tgt_feats_un,
                                                                  require_padding_mask=True)
         
+        # print("src_feats_padded: ",src_feats_padded.shape)
+        # print("src_key_padding_mask: ",src_key_padding_mask.shape)
+        
+        src_xyz_c_padded, src_xyz_c_padding_mask, _ = pad_sequence(src_xyz_c,
+                                                                 require_padding_mask=True)
+        tgt_xyz_c_padded, tgt_xyz_c_padding_mask, _ = pad_sequence(tgt_xyz_c,
+                                                                 require_padding_mask=True)
+        
+        
         if self.use_geo:
+            src_xyz_c_tmp = src_xyz_c_padded.transpose(0,1)
+            tgt_xyz_c_tmp = tgt_xyz_c_padded.transpose(0,1)
+            src_feats_padded = src_feats_padded.transpose(0,1)
+            tgt_feats_padded = tgt_feats_padded.transpose(0,1)
+            
+            
+            # print("src_xyz_c_tmp: ",src_xyz_c_tmp.shape)
+            # print("src_feats_padded: ",src_feats_padded.shape)
+            
             src_feats_cond, tgt_feats_cond = self.transformer_encoder(
-            src_xyz_c,
-            tgt_xyz_c,
+            src_xyz_c_tmp,
+            tgt_xyz_c_tmp,
             src_feats_padded,
             tgt_feats_padded,
+            src_xyz_c_padding_mask,
+            tgt_xyz_c_padding_mask
         )
+            src_feats_padded = src_feats_padded.transpose(0,1)
+            tgt_feats_padded = tgt_feats_padded.transpose(0,1)
+            
+            # print("src_feats_cond.shape: ",src_feats_cond.shape)
+            
+            src_feats_cond = src_feats_cond.transpose(0,1).unsqueeze(0).expand(6, -1, -1, -1)
+            tgt_feats_cond = tgt_feats_cond.transpose(0,1).unsqueeze(0).expand(6, -1, -1, -1)
+            
+            # print("src_feats_cond.shape: ",src_feats_cond.shape)
+            
         else:
             src_feats_cond, tgt_feats_cond = self.transformer_encoder(
                 src_feats_padded, tgt_feats_padded,
