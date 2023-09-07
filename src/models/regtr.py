@@ -17,7 +17,7 @@ from utils.se3_torch import compute_rigid_transform, se3_transform_list, se3_inv
 from utils.seq_manipulation import split_src_tgt, pad_sequence, unpad_sequences
 from utils.viz import visualize_registration
 _TIMEIT = False
-from geotansformer.geotransformers import GeometricTransformer 
+from models.geotansformer.geotransformers import GeometricTransformer 
 
 class RegTR(GenericRegModel):
     def __init__(self, cfg, *args, **kwargs):
