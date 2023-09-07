@@ -8,7 +8,7 @@ dataset:
     root: '../data/indoor'
     augment_noise: 0.005
     perturb_pose: small
-    train_batch_size: 1
+    train_batch_size: 2
     val_batch_size: 4
     test_batch_size: 1
     overlap_radius: 0.0375  # Distance below which points will be considered to be overlapping
@@ -70,9 +70,11 @@ kpconv_options:
                    'resnetb',
                    'resnetb'] # 10
     use_att_in_backbone: False
-    use_att_cross: True
+    use_cross_att: True
+    use_corss_att_in_backbone: [6, 7, 9, 10]
     att_add_pos: [6, 7, 9, 10]
     head: 4
+    nhead_cross: 4
 
 model:
     model: regtr.RegTR

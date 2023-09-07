@@ -431,7 +431,7 @@ def block_decider(block_name,
                   in_dim,
                   out_dim,
                   layer_ind,
-                  config, att):
+                  config, att, use_cross_att):
     if block_name == 'unary':
         return UnaryBlock(in_dim, out_dim, config.use_batch_norm, config.batch_norm_momentum)
 
@@ -456,7 +456,7 @@ def block_decider(block_name,
                         'resnetb_deformable_strided',
                         'resnetb_equivariant_strided',
                         'resnetb_invariant_strided']:
-        return ResnetBottleneckBlock(block_name, in_dim, out_dim, radius, layer_ind, config, att)
+        return ResnetBottleneckBlock(block_name, in_dim, out_dim, radius, layer_ind, config, att, use_cross_att)
 
     elif block_name == 'max_pool' or block_name == 'max_pool_wide':
         return MaxPoolBlock(layer_ind)
@@ -648,7 +648,7 @@ class SimpleBlock(nn.Module):
 
 class ResnetBottleneckBlock(nn.Module):
 
-    def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, config, use_att):
+    def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, config, use_att, use_cross_att):
         """
         Initialize a resnet bottleneck block.
         :param in_dim: dimension input features
@@ -703,12 +703,12 @@ class ResnetBottleneckBlock(nn.Module):
 
         # self.attention
         self.use_att = use_att
-        self.use_att_cross = config.use_att_cross
+        self.use_att_cross = use_cross_att
             
         if self.use_att_cross:
-            self.k1 = nn.Parameter(torch.tensor(1))
-            self.k2 = nn.Parameter(torch.tensor(1))
-            self.k3 = nn.Parameter(torch.tensor(1))
+            self.k1 = nn.Parameter(torch.tensor(1.0))
+            self.k2 = nn.Parameter(torch.tensor(1.0))
+            self.k3 = nn.Parameter(torch.tensor(1.0))
             
             self.linear2 = nn.Linear(out_dim, out_dim)
             self.linear5 = nn.Linear(out_dim, out_dim)
@@ -722,6 +722,7 @@ class ResnetBottleneckBlock(nn.Module):
             self.drop2 = nn.Dropout(0.1)
             
             self.multihead_attn = nn.MultiheadAttention(out_dim, config.nhead_cross)
+            self.attention = nn.MultiheadAttention(out_dim, config.head)
             
             print("using cross in backbone!!")
             

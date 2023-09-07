@@ -66,14 +66,21 @@ class KPFEncoder(torch.nn.Module):
                                                      in_dim,
                                                      out_dim,
                                                      octave,
-                                                     config, True))
+                                                     config, True, False))
+            elif i in i_block and config.use_corss_att_in_backbone:
+                self.encoder_blocks.append(block_decider(block,
+                                                     r,
+                                                     in_dim,
+                                                     out_dim,
+                                                     octave,
+                                                     config, False, True))
             else:
                 self.encoder_blocks.append(block_decider(block,
                                                      r,
                                                      in_dim,
                                                      out_dim,
                                                      octave,
-                                                     config, False))
+                                                     config, False, False))
 
             # Update dimension of input from output
             if 'simple' in block:
