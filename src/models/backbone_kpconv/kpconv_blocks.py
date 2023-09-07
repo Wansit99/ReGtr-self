@@ -706,7 +706,7 @@ class ResnetBottleneckBlock(nn.Module):
         if use_att:
             self.gelu = nn.GELU()
             self.attention = nn.MultiheadAttention(out_dim, 1, 0.0)
-            self.k1 = nn.Parameter(torch.tensor(0.0))
+            self.k1 = nn.Parameter(torch.tensor(1.3863))
             # self.k2 = nn.Parameter(torch.tensor(0.0))
             self.sigmoid = nn.Sigmoid()
             # self.layernorm1 = nn.LayerNorm(out_dim)
@@ -714,6 +714,7 @@ class ResnetBottleneckBlock(nn.Module):
             self.layernorm3 = nn.LayerNorm(out_dim)
             # self.linear1 = nn.Linear(out_dim, out_dim)
             self.linear2 = nn.Linear(out_dim, out_dim)
+            self.linear5 = nn.Linear(out_dim, out_dim)
             self.linear3 = nn.Linear(out_dim, out_dim//2)
             self.linear4 = nn.Linear(out_dim//2, out_dim)
 
@@ -766,8 +767,8 @@ class ResnetBottleneckBlock(nn.Module):
 
             attn_output, _ = self.attention(x, x, x)
             attn_output = self.layernorm2(
-                (self.drop1(self.linear2((attn_output))))*(1-self.sigmoid(self.k1)) 
-                + (self.sigmoid(self.k1))*x)
+                (self.drop1((self.linear2((attn_output)))))*(1-self.sigmoid(self.k1)) 
+                + (self.sigmoid(self.k1))*self.linear5(x))
             attn_layer = self.gelu(self.linear3(attn_output))
             attn_layer = self.drop2(self.linear4(attn_layer)) + attn_output
             return self.layernorm3(attn_layer)
