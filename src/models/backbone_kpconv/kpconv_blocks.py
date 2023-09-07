@@ -767,7 +767,7 @@ class ResnetBottleneckBlock(nn.Module):
 
             attn_output, _ = self.attention(x, x, x)
             attn_output = self.layernorm2(
-                (self.drop1((self.linear2((attn_output)))))*(1-self.sigmoid(self.k1)) 
+                (self.drop1(self.linear5(self.linear2((attn_output)))))*(1-self.sigmoid(self.k1)) 
                 + (self.sigmoid(self.k1))*self.linear5(x))
             attn_layer = self.gelu(self.linear3(attn_output))
             attn_layer = self.drop2(self.linear4(attn_layer)) + attn_output
