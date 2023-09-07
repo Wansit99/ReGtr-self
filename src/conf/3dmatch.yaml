@@ -98,6 +98,21 @@ model:
     direct_regress_coor: True  # Whether to regress coordinates using MLP (True) or a final attention layer (False)
 
 
+# model - GeoTransformer
+geotransformer:
+    use_geotransformer: False
+    geotransformer_input_dim: 256
+    geotransformer_hidden_dim: 128
+    geotransformer_output_dim: 256
+    geotransformer_num_heads: 4
+    geotransformer_blocks: ['self', 'cross', 'self', 'cross', 'self', 'cross']
+    geotransformer_sigma_d: 4.8
+    geotransformer_sigma_a: 15
+    geotransformer_angle_k: 3
+    geotransformer_reduction_a: 'max'
+
+
+
 losses:
     # Overlap loss
     wt_overlap: 1.0

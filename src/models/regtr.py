@@ -17,7 +17,7 @@ from utils.se3_torch import compute_rigid_transform, se3_transform_list, se3_inv
 from utils.seq_manipulation import split_src_tgt, pad_sequence, unpad_sequences
 from utils.viz import visualize_registration
 _TIMEIT = False
-
+from geotansformer.geotransformers import GeometricTransformer 
 
 class RegTR(GenericRegModel):
     def __init__(self, cfg, *args, **kwargs):
@@ -49,18 +49,32 @@ class RegTR(GenericRegModel):
         #######################
         # Attention propagation
         #######################
-        encoder_layer = TransformerCrossEncoderLayer(
-            cfg.d_embed, cfg.nhead, cfg.d_feedforward, cfg.dropout,
-            activation=cfg.transformer_act,
-            normalize_before=cfg.pre_norm,
-            sa_val_has_pos_emb=cfg.sa_val_has_pos_emb,
-            ca_val_has_pos_emb=cfg.ca_val_has_pos_emb,
-            attention_type=cfg.attention_type,
+        self.use_geo = cfg.use_geotransformer
+        if cfg.use_geotransformer:
+            self.transformer_encoder = GeometricTransformer(
+            cfg.d_embed,
+            cfg.geotransformer_hidden_dim,
+            cfg.geotransformer_output_dim,
+            cfg.geotransformer_num_heads,
+            cfg.geotransformer_blocks,
+            cfg.geotransformer_sigma_d,
+            cfg.geotransformer_sigma_a,
+            cfg.geotransformer_angle_k,
+            reduction_a = cfg.geotransformer_reduction_a,
         )
-        encoder_norm = nn.LayerNorm(cfg.d_embed) if cfg.pre_norm else None
-        self.transformer_encoder = TransformerCrossEncoder(
-            encoder_layer, cfg.num_encoder_layers, encoder_norm,
-            return_intermediate=True)
+        else:
+            encoder_layer = TransformerCrossEncoderLayer(
+                cfg.d_embed, cfg.nhead, cfg.d_feedforward, cfg.dropout,
+                activation=cfg.transformer_act,
+                normalize_before=cfg.pre_norm,
+                sa_val_has_pos_emb=cfg.sa_val_has_pos_emb,
+                ca_val_has_pos_emb=cfg.ca_val_has_pos_emb,
+                attention_type=cfg.attention_type,
+            )
+            encoder_norm = nn.LayerNorm(cfg.d_embed) if cfg.pre_norm else None
+            self.transformer_encoder = TransformerCrossEncoder(
+                encoder_layer, cfg.num_encoder_layers, encoder_norm,
+                return_intermediate=True)
 
         #######################
         # Output layers
@@ -160,13 +174,22 @@ class RegTR(GenericRegModel):
                                                                  require_padding_mask=True)
         tgt_feats_padded, tgt_key_padding_mask, _ = pad_sequence(tgt_feats_un,
                                                                  require_padding_mask=True)
-        src_feats_cond, tgt_feats_cond = self.transformer_encoder(
-            src_feats_padded, tgt_feats_padded,
-            src_key_padding_mask=src_key_padding_mask,
-            tgt_key_padding_mask=tgt_key_padding_mask,
-            src_pos=src_pe_padded if self.cfg.transformer_encoder_has_pos_emb else None,
-            tgt_pos=tgt_pe_padded if self.cfg.transformer_encoder_has_pos_emb else None,
+        
+        if self.use_geo:
+            src_feats_cond, tgt_feats_cond = self.transformer_encoder(
+            src_xyz_c,
+            tgt_xyz_c,
+            src_feats_padded,
+            tgt_feats_padded,
         )
+        else:
+            src_feats_cond, tgt_feats_cond = self.transformer_encoder(
+                src_feats_padded, tgt_feats_padded,
+                src_key_padding_mask=src_key_padding_mask,
+                tgt_key_padding_mask=tgt_key_padding_mask,
+                src_pos=src_pe_padded if self.cfg.transformer_encoder_has_pos_emb else None,
+                tgt_pos=tgt_pe_padded if self.cfg.transformer_encoder_has_pos_emb else None,
+            )
 
         src_corr_list, tgt_corr_list, src_overlap_list, tgt_overlap_list = \
             self.correspondence_decoder(src_feats_cond, tgt_feats_cond, src_xyz_c, tgt_xyz_c)
