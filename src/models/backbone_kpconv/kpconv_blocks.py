@@ -703,9 +703,31 @@ class ResnetBottleneckBlock(nn.Module):
 
         # self.attention
         self.use_att = use_att
-        if use_att:
+        self.use_att_cross = config.use_att_cross
+            
+        if self.use_att_cross:
+            self.k1 = nn.Parameter(torch.tensor(1))
+            self.k2 = nn.Parameter(torch.tensor(1))
+            self.k3 = nn.Parameter(torch.tensor(1))
+            
+            self.linear2 = nn.Linear(out_dim, out_dim)
+            self.linear5 = nn.Linear(out_dim, out_dim)
+            self.linear3 = nn.Linear(out_dim, out_dim//2)
+            self.linear4 = nn.Linear(out_dim//2, out_dim)
+            
             self.gelu = nn.GELU()
-            self.attention = nn.MultiheadAttention(out_dim, config.head, 0.0)
+            self.layernorm2 = nn.LayerNorm(out_dim)
+            self.layernorm3 = nn.LayerNorm(out_dim)
+            self.drop1 = nn.Dropout(0.1)
+            self.drop2 = nn.Dropout(0.1)
+            
+            self.multihead_attn = nn.MultiheadAttention(out_dim, config.nhead_cross)
+            
+            print("using cross in backbone!!")
+            
+        elif use_att:
+            self.gelu = nn.GELU()
+            self.attention = nn.MultiheadAttention(out_dim, config.head)
             self.k1 = nn.Parameter(torch.tensor(1.3863))
             # self.k2 = nn.Parameter(torch.tensor(0.0))
             self.sigmoid = nn.Sigmoid()
@@ -720,8 +742,6 @@ class ResnetBottleneckBlock(nn.Module):
 
             self.drop1 = nn.Dropout(0.1)
             self.drop2 = nn.Dropout(0.1)
-        elif self.use_att_cross:
-            self.multihead_attn = nn.MultiheadAttention(out_dim, nhead, dropout=dropout)
         else:
             self.attention = None
 
@@ -777,15 +797,28 @@ class ResnetBottleneckBlock(nn.Module):
         
         if self.use_att_cross:
             # 得到local特征
-            x = self.leaky_relu(x + shortcut)
+            local_x = self.leaky_relu(x + shortcut)
             
             # 得到全局特征
-            attn_output, _ = self.attention(x, x, x)
+            global_x, _ = self.attention(local_x, local_x, local_x)
             
             # 分别得到各自交叉注意力之后的局部，全局特征
+            
+            global_x_new, xatt_weights_s = self.multihead_attn(query=global_x,
+                                                   key=local_x,
+                                                   value=local_x)
+            local_x_new, xatt_weights_s = self.multihead_attn(query=local_x,
+                                                   key=global_x,
+                                                   value=global_x)
+            
+            
+            params = torch.stack([self.k1, self.k2, self.k3])
+            # 使用Softmax函数确保输出值在[0,1]范围内且它们的和为1
+            k1, k2, k3 = F.softmax(params, dim=0)
+            
             attn_output = self.layernorm2(
-                (self.drop1(self.linear5(self.linear2((attn_output)))))*(1-self.sigmoid(self.k1)) 
-                + (self.sigmoid(self.k1))*self.linear5(x))
+                self.drop1(self.linear5(self.linear2((global_x_new))))*k1
+                + k2*local_x + k3*local_x_new)
             attn_layer = self.gelu(self.linear3(attn_output))
             attn_layer = self.drop2(self.linear4(attn_layer)) + attn_output
             return self.layernorm3(attn_layer)
