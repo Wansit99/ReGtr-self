@@ -35,7 +35,12 @@ class KPFEncoder(torch.nn.Module):
         self.encoder_skips = []
 
         i = 0
-        i_block = config.att_add_pos
+        if config.use_att_in_backbone:
+            i_block = config.att_add_pos
+        elif config.use_cross_att:
+            i_block = config.use_corss_att_in_backbone
+        else:
+            i_block = [-1]
         # Loop over consecutive blocks
         for block_i, block in enumerate(config.architecture):
 
@@ -60,20 +65,21 @@ class KPFEncoder(torch.nn.Module):
             #                                          octave,
             #                                          config, False))
             
-            if i in i_block and config.use_att_in_backbone:
+            if i in i_block and config.use_att_in_backbone :
                 self.encoder_blocks.append(block_decider(block,
                                                      r,
                                                      in_dim,
                                                      out_dim,
                                                      octave,
                                                      config, True, False))
-            elif i in i_block and config.use_corss_att_in_backbone:
+            elif i in i_block and config.use_cross_att:
                 self.encoder_blocks.append(block_decider(block,
                                                      r,
                                                      in_dim,
                                                      out_dim,
                                                      octave,
                                                      config, False, True))
+                print("config.use_cross_att:", config.use_cross_att)
             else:
                 self.encoder_blocks.append(block_decider(block,
                                                      r,

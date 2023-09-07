@@ -15,7 +15,7 @@ dataset:
 
 train_options:
 # -70就是70epochs
-    niter: -70  # Actually just need 40-50 epochs.
+    niter: -50  # Actually just need 40-50 epochs.
 
 solver:
     optimizer: AdamW
@@ -70,11 +70,12 @@ kpconv_options:
                    'resnetb',
                    'resnetb'] # 10
     use_att_in_backbone: False
-    use_cross_att: True
-    use_corss_att_in_backbone: [6, 7, 9, 10]
     att_add_pos: [6, 7, 9, 10]
-    head: 4
-    nhead_cross: 4
+    use_cross_att: False
+    use_corss_att_in_backbone: [6, 7, 9, 10]
+    
+    head: 2
+    nhead_cross: 2
 
 model:
     model: regtr.RegTR
