@@ -70,7 +70,7 @@ kpconv_options:
                    'resnetb',
                    'resnetb'] # 10
     use_att_in_backbone: True
-    att_add_pos: [7,10]
+    att_add_pos: [6, 7, 9, 10]
     head: 4
 
 model:

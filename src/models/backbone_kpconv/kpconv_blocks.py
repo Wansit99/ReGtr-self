@@ -705,7 +705,7 @@ class ResnetBottleneckBlock(nn.Module):
         self.use_att = use_att
         if use_att:
             self.gelu = nn.GELU()
-            self.attention = nn.MultiheadAttention(out_dim, 1, 0.0)
+            self.attention = nn.MultiheadAttention(out_dim, config.head, 0.0)
             self.k1 = nn.Parameter(torch.tensor(1.3863))
             # self.k2 = nn.Parameter(torch.tensor(0.0))
             self.sigmoid = nn.Sigmoid()
@@ -720,6 +720,8 @@ class ResnetBottleneckBlock(nn.Module):
 
             self.drop1 = nn.Dropout(0.1)
             self.drop2 = nn.Dropout(0.1)
+        elif self.use_att_cross:
+            self.multihead_attn = nn.MultiheadAttention(out_dim, nhead, dropout=dropout)
         else:
             self.attention = None
 
@@ -772,6 +774,22 @@ class ResnetBottleneckBlock(nn.Module):
             attn_layer = self.gelu(self.linear3(attn_output))
             attn_layer = self.drop2(self.linear4(attn_layer)) + attn_output
             return self.layernorm3(attn_layer)
+        
+        if self.use_att_cross:
+            # 得到local特征
+            x = self.leaky_relu(x + shortcut)
+            
+            # 得到全局特征
+            attn_output, _ = self.attention(x, x, x)
+            
+            # 分别得到各自交叉注意力之后的局部，全局特征
+            attn_output = self.layernorm2(
+                (self.drop1(self.linear5(self.linear2((attn_output)))))*(1-self.sigmoid(self.k1)) 
+                + (self.sigmoid(self.k1))*self.linear5(x))
+            attn_layer = self.gelu(self.linear3(attn_output))
+            attn_layer = self.drop2(self.linear4(attn_layer)) + attn_output
+            return self.layernorm3(attn_layer)
+            
         
         return self.leaky_relu(x + shortcut)
 
