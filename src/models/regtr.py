@@ -41,6 +41,10 @@ class RegTR(GenericRegModel):
         #######################
         if cfg.use_self_emd:
             self.pos_embed = PositionEmbeddingSelf(cfg.d_embed)
+            print("using use_self_emd!!")
+            print("using use_self_emd!!")
+            print("using use_self_emd!!")
+            print("using use_self_emd!!")
         else:
             if cfg.get('pos_emb_type', 'sine') == 'sine':
                 self.pos_embed = PositionEmbeddingCoordsSine(3, cfg.d_embed,
@@ -180,10 +184,10 @@ class RegTR(GenericRegModel):
         if self.use_self_emd:
             src_xyz_c, tgt_xyz_c = split_src_tgt(kpconv_meta['points'][-1], slens_c)
             src_xyz_nei_indx, tgt_xyz_nei_indx = split_src_tgt(kpconv_meta['neighbors'][-1], slens_c)
-            src_xyz_c_nei, tgt_xyz_c_nei = split_src_tgt(kpconv_meta['points'][0], slens_c)
+            src_xyz_c_all, tgt_xyz_c_all = split_src_tgt(kpconv_meta['points'][0], slens[0])
             
-            src_pe = self.pos_embed(src_xyz_c, src_xyz_nei_indx, src_xyz_c_nei)
-            tgt_pe = self.pos_embed(tgt_xyz_c, tgt_xyz_nei_indx, tgt_xyz_c_nei)
+            src_pe = self.pos_embed(src_xyz_c, src_xyz_nei_indx, src_xyz_c_all)
+            tgt_pe = self.pos_embed(tgt_xyz_c, tgt_xyz_nei_indx, tgt_xyz_c_all)
             src_pe_padded, _, _ = pad_sequence(src_pe)
             tgt_pe_padded, _, _ = pad_sequence(tgt_pe)
             

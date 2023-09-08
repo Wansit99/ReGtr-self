@@ -71,11 +71,11 @@ kpconv_options:
                    'resnetb'] # 10
     use_att_in_backbone: False
     att_add_pos: [6, 7, 9, 10]
-    use_cross_att: False
+    use_cross_att: True
     use_corss_att_in_backbone: [6, 7, 9, 10]
     
-    head: 2
-    nhead_cross: 2
+    head: 4
+    nhead_cross: 4
 
 model:
     model: regtr.RegTR
@@ -96,6 +96,7 @@ model:
     sa_val_has_pos_emb: True
     ca_val_has_pos_emb: True
     pos_emb_type: sine  # either 'sine' or 'learned'
+    use_self_emd: True
 
     # Correspondence decoding
     corr_decoder_has_pos_emb: True

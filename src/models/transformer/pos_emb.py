@@ -29,8 +29,15 @@ class PositionEmbeddingSelf(nn.Module):
             points = points_xyz[i] # N, 3
             # 得到当前批次的原始点的邻居的index
             index_tmp = index[i] # N, k
-            # 得到当前批次的原始点的邻居的x,y,z 
-            points_neig_xyz = all_points_xyz[index_tmp] # N, K, 3
+            # 得到当前批次的原始点的邻居的x,y,z
+            # print("index_tmp.shape:", index_tmp.shape)
+            # print("index_tmp.dtype:", index_tmp.dtype)
+            # print(all_points_xyz.shape)
+            # print(index_tmp.max())
+            points_neig_xyz = all_points_xyz[i][index_tmp] # N, K, 3
+            # print("all_points_xyz[i].shape:", all_points_xyz[i].shape)
+            # print("index_tmp.shape:", index_tmp.shape)
+            # print("points_neig_xyz.shape:", points_neig_xyz.shape)
             # 得到N,K
             N, K, _ = points_neig_xyz.shape
             # 将原始点的x,y,z复制k次
