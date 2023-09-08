@@ -11,6 +11,7 @@ from models.losses.corr_loss import CorrCriterion
 from models.losses.feature_loss import InfoNCELossFull, CircleLossFull
 from models.transformer.position_embedding import PositionEmbeddingCoordsSine, \
     PositionEmbeddingLearned
+from models.transformer.pos_emb import PositionEmbeddingSelf
 from models.transformer.transformers import \
     TransformerCrossEncoderLayer, TransformerCrossEncoder
 from utils.se3_torch import compute_rigid_transform, se3_transform_list, se3_inv
@@ -38,13 +39,16 @@ class RegTR(GenericRegModel):
         #######################
         # Embeddings
         #######################
-        if cfg.get('pos_emb_type', 'sine') == 'sine':
-            self.pos_embed = PositionEmbeddingCoordsSine(3, cfg.d_embed,
-                                                         scale=cfg.get('pos_emb_scaling', 1.0))
-        elif cfg['pos_emb_type'] == 'learned':
-            self.pos_embed = PositionEmbeddingLearned(3, cfg.d_embed)
+        if cfg.use_self_emd:
+            self.pos_embed = PositionEmbeddingSelf(cfg.d_embed)
         else:
-            raise NotImplementedError
+            if cfg.get('pos_emb_type', 'sine') == 'sine':
+                self.pos_embed = PositionEmbeddingCoordsSine(3, cfg.d_embed,
+                                                            scale=cfg.get('pos_emb_scaling', 1.0))
+            elif cfg['pos_emb_type'] == 'learned':
+                self.pos_embed = PositionEmbeddingLearned(3, cfg.d_embed)
+            else:
+                raise NotImplementedError
 
         #######################
         # Attention propagation
@@ -95,6 +99,8 @@ class RegTR(GenericRegModel):
             self.correspondence_decoder = CorrespondenceDecoder(cfg.d_embed,
                                                                 cfg.corr_decoder_has_pos_emb,
                                                                 self.pos_embed)
+            
+        self.use_self_emd = cfg.use_self_emd
 
         #######################
         # Losses
@@ -171,10 +177,21 @@ class RegTR(GenericRegModel):
         src_feats_un, tgt_feats_un = split_src_tgt(both_feats_un, slens_c)
 
         # Position embedding for downsampled points
-        src_xyz_c, tgt_xyz_c = split_src_tgt(kpconv_meta['points'][-1], slens_c)
-        src_pe, tgt_pe = split_src_tgt(self.pos_embed(kpconv_meta['points'][-1]), slens_c)
-        src_pe_padded, _, _ = pad_sequence(src_pe)
-        tgt_pe_padded, _, _ = pad_sequence(tgt_pe)
+        if self.use_self_emd:
+            src_xyz_c, tgt_xyz_c = split_src_tgt(kpconv_meta['points'][-1], slens_c)
+            src_xyz_nei_indx, tgt_xyz_nei_indx = split_src_tgt(kpconv_meta['neighbors'][-1], slens_c)
+            src_xyz_c_nei, tgt_xyz_c_nei = split_src_tgt(kpconv_meta['points'][0], slens_c)
+            
+            src_pe = self.pos_embed(src_xyz_c, src_xyz_nei_indx, src_xyz_c_nei)
+            tgt_pe = self.pos_embed(tgt_xyz_c, tgt_xyz_nei_indx, tgt_xyz_c_nei)
+            src_pe_padded, _, _ = pad_sequence(src_pe)
+            tgt_pe_padded, _, _ = pad_sequence(tgt_pe)
+            
+        else:
+            src_xyz_c, tgt_xyz_c = split_src_tgt(kpconv_meta['points'][-1], slens_c)
+            src_pe, tgt_pe = split_src_tgt(self.pos_embed(kpconv_meta['points'][-1]), slens_c)
+            src_pe_padded, _, _ = pad_sequence(src_pe)
+            tgt_pe_padded, _, _ = pad_sequence(tgt_pe)
 
         # Performs padding, then apply attention (REGTR "encoder" stage) to condition on the other
         # point cloud
