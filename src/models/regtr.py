@@ -232,11 +232,9 @@ class RegTR(GenericRegModel):
             
             # print("src_feats_cond.shape: ",src_feats_cond.shape)
             
-            src_feats_cond = src_feats_cond.transpose(1,2)
-            tgt_feats_cond = tgt_feats_cond.transpose(1,2)
+            # src_feats_cond = src_feats_cond.transpose(0,1).unsqueeze(0).expand(6, -1, -1, -1)
+            # tgt_feats_cond = tgt_feats_cond.transpose(0,1).unsqueeze(0).expand(6, -1, -1, -1)
             
-            # print("src_feats_cond.shape: ", src_feats_cond.shape)
-            # print("tgt_feats_cond.shape: ", tgt_feats_cond.shape)
             # print("src_feats_cond.shape: ",src_feats_cond.shape)
             
         else:
