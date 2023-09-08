@@ -153,7 +153,7 @@ class GeometricTransformer(nn.Module):
         self.transformer = RPEConditionalTransformer(
             blocks, hidden_dim, num_heads, dropout=dropout, activation_fn=activation_fn
         )
-        self.out_proj = nn.Linear(hidden_dim, output_dim)
+        self.out_proj = nn.ModuleList([nn.Linear(hidden_dim, output_dim) for _ in range(len(blocks))])
 
     def forward(
         self,
@@ -192,11 +192,19 @@ class GeometricTransformer(nn.Module):
             masks0=ref_masks,
             masks1=src_masks,
         )
+        # print("ref_feats[5].shape: ", ref_feats[5].shape)
+        # print("ref_feats[5].shape: ", ref_feats[5].shape)
+        # print("ref_feats[5].shape: ", ref_feats[5].shape)
+        # print("ref_feats[5].shape: ", ref_feats[5].shape)
+        # print("ref_feats[5].shape: ", ref_feats[5].shape)
+        # print("ref_feats[5].shape: ", ref_feats[5].shape)
+        
+        ref_feats = [fc_layer(tensor) for tensor, fc_layer in zip(ref_feats, self.out_proj)]
+        src_feats = [fc_layer(tensor) for tensor, fc_layer in zip(src_feats, self.out_proj)]
+        # ref_feats = self.out_proj(ref_feats)
+        # src_feats = self.out_proj(src_feats)
 
-        ref_feats = self.out_proj(ref_feats)
-        src_feats = self.out_proj(src_feats)
-
-        return src_feats, ref_feats
+        return ref_feats, src_feats
 
 
 def _check_block_type(block):
@@ -468,6 +476,7 @@ class RPEConditionalTransformer(nn.Module):
         activation_fn='ReLU',
         return_attention_scores=False,
         parallel=False,
+        return_feats_list=True,
     ):
         super(RPEConditionalTransformer, self).__init__()
         self.blocks = blocks
@@ -481,25 +490,59 @@ class RPEConditionalTransformer(nn.Module):
         self.layers = nn.ModuleList(layers)
         self.return_attention_scores = return_attention_scores
         self.parallel = parallel
-
+        self.return_feats_list = return_feats_list
+        
+        
     def forward(self, feats0, feats1, embeddings0, embeddings1, masks0=None, masks1=None):
         attention_scores = []
-        for i, block in enumerate(self.blocks):
-            if block == 'self':
-                feats0, scores0 = self.layers[i](feats0, feats0, embeddings0, memory_masks=masks0)
-                feats1, scores1 = self.layers[i](feats1, feats1, embeddings1, memory_masks=masks1)
-            else:
-                if self.parallel:
-                    new_feats0, scores0 = self.layers[i](feats0, feats1, memory_masks=masks1)
-                    new_feats1, scores1 = self.layers[i](feats1, feats0, memory_masks=masks0)
-                    feats0 = new_feats0
-                    feats1 = new_feats1
+        if self.return_feats_list:
+            src_intermediate, tgt_intermediate = [], []
+            
+            for i, block in enumerate(self.blocks):
+                if block == 'self':
+                    feats0, scores0 = self.layers[i](feats0, feats0, embeddings0, memory_masks=masks0)
+                    feats1, scores1 = self.layers[i](feats1, feats1, embeddings1, memory_masks=masks1)
+                    
+                    src_intermediate.append(feats1) 
+                    tgt_intermediate.append(feats0) 
+                    
                 else:
-                    feats0, scores0 = self.layers[i](feats0, feats1, memory_masks=masks1)
-                    feats1, scores1 = self.layers[i](feats1, feats0, memory_masks=masks0)
+                    if self.parallel:
+                        new_feats0, scores0 = self.layers[i](feats0, feats1, memory_masks=masks1)
+                        new_feats1, scores1 = self.layers[i](feats1, feats0, memory_masks=masks0)
+                        feats0 = new_feats0
+                        feats1 = new_feats1
+                        src_intermediate.append(feats1) 
+                        tgt_intermediate.append(feats0) 
+                    else:
+                        feats0, scores0 = self.layers[i](feats0, feats1, memory_masks=masks1)
+                        feats1, scores1 = self.layers[i](feats1, feats0, memory_masks=masks0)
+                        src_intermediate.append(feats1) 
+                        tgt_intermediate.append(feats0) 
+                if self.return_attention_scores:
+                    attention_scores.append([scores0, scores1])
             if self.return_attention_scores:
-                attention_scores.append([scores0, scores1])
-        if self.return_attention_scores:
-            return feats0, feats1, attention_scores
+                return feats0, feats1, attention_scores
+            else:
+                return tgt_intermediate, src_intermediate
+            
         else:
-            return feats0, feats1
+            for i, block in enumerate(self.blocks):
+                if block == 'self':
+                    feats0, scores0 = self.layers[i](feats0, feats0, embeddings0, memory_masks=masks0)
+                    feats1, scores1 = self.layers[i](feats1, feats1, embeddings1, memory_masks=masks1)
+                else:
+                    if self.parallel:
+                        new_feats0, scores0 = self.layers[i](feats0, feats1, memory_masks=masks1)
+                        new_feats1, scores1 = self.layers[i](feats1, feats0, memory_masks=masks0)
+                        feats0 = new_feats0
+                        feats1 = new_feats1
+                    else:
+                        feats0, scores0 = self.layers[i](feats0, feats1, memory_masks=masks1)
+                        feats1, scores1 = self.layers[i](feats1, feats0, memory_masks=masks0)
+                if self.return_attention_scores:
+                    attention_scores.append([scores0, scores1])
+            if self.return_attention_scores:
+                return feats0, feats1, attention_scores
+            else:
+                return feats0, feats1

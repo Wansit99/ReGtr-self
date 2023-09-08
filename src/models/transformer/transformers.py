@@ -37,15 +37,29 @@ class TransformerCrossEncoder(nn.Module):
 
         if self.use_geo:
             for layer in self.layers:
-                src, tgt = layer(src,
-                                tgt,
-                                src_mask,
+                tgt_intermediate, src_intermediate = layer(tgt,
+                                src,
                                 tgt_mask,
-                                src_pos,
-                                tgt_pos)
+                                src_mask,
+                                tgt_key_padding_mask,
+                                src_key_padding_mask)
+                # if self.return_intermediate:
+                #     src_intermediate.append(self.norm(src_mask) if self.norm is not None else src_mask)
+                #     tgt_intermediate.append(self.norm(tgt_mask) if self.norm is not None else tgt_mask)
+                if self.norm is not None:
+                    src = self.norm(src_mask)
+                    tgt = self.norm(tgt_mask)
+                    if self.return_intermediate:
+                        if len(self.layers) > 0:
+                            src_intermediate.pop()
+                            tgt_intermediate.pop()
+                        src_intermediate.append(src)
+                        tgt_intermediate.append(tgt)
+
                 if self.return_intermediate:
-                    src_intermediate.append(self.norm(src) if self.norm is not None else src)
-                    tgt_intermediate.append(self.norm(tgt) if self.norm is not None else tgt)
+                    return torch.stack(src_intermediate), torch.stack(tgt_intermediate)
+
+                return src.unsqueeze(0), tgt.unsqueeze(0)
                     
         else:
             for layer in self.layers:
@@ -57,20 +71,20 @@ class TransformerCrossEncoder(nn.Module):
                     src_intermediate.append(self.norm(src) if self.norm is not None else src)
                     tgt_intermediate.append(self.norm(tgt) if self.norm is not None else tgt)
 
-        if self.norm is not None:
-            src = self.norm(src)
-            tgt = self.norm(tgt)
-            if self.return_intermediate:
-                if len(self.layers) > 0:
-                    src_intermediate.pop()
-                    tgt_intermediate.pop()
-                src_intermediate.append(src)
-                tgt_intermediate.append(tgt)
+                if self.norm is not None:
+                    src = self.norm(src)
+                    tgt = self.norm(tgt)
+                    if self.return_intermediate:
+                        if len(self.layers) > 0:
+                            src_intermediate.pop()
+                            tgt_intermediate.pop()
+                        src_intermediate.append(src)
+                        tgt_intermediate.append(tgt)
 
-        if self.return_intermediate:
-            return torch.stack(src_intermediate), torch.stack(tgt_intermediate)
+                if self.return_intermediate:
+                    return torch.stack(src_intermediate), torch.stack(tgt_intermediate)
 
-        return src.unsqueeze(0), tgt.unsqueeze(0)
+                return src.unsqueeze(0), tgt.unsqueeze(0)
 
     def get_attentions(self):
         """For analysis: Retrieves the attention maps last computed by the individual layers."""
