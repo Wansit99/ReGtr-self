@@ -17,12 +17,13 @@ from torch import nn, Tensor
 
 class TransformerCrossEncoder(nn.Module):
 
-    def __init__(self, cross_encoder_layer, num_layers, norm=None, return_intermediate=False):
+    def __init__(self, cross_encoder_layer, num_layers, norm=None, return_intermediate=False,use_geo=False):
         super().__init__()
         self.layers = _get_clones(cross_encoder_layer, num_layers)
         self.num_layers = num_layers
         self.norm = norm
         self.return_intermediate = return_intermediate
+        self.use_geo = use_geo
 
     def forward(self, src, tgt,
                 src_mask: Optional[Tensor] = None,
@@ -34,14 +35,27 @@ class TransformerCrossEncoder(nn.Module):
 
         src_intermediate, tgt_intermediate = [], []
 
-        for layer in self.layers:
-            src, tgt = layer(src, tgt, src_mask=src_mask, tgt_mask=tgt_mask,
-                             src_key_padding_mask=src_key_padding_mask,
-                             tgt_key_padding_mask=tgt_key_padding_mask,
-                             src_pos=src_pos, tgt_pos=tgt_pos)
-            if self.return_intermediate:
-                src_intermediate.append(self.norm(src) if self.norm is not None else src)
-                tgt_intermediate.append(self.norm(tgt) if self.norm is not None else tgt)
+        if self.use_geo:
+            for layer in self.layers:
+                src, tgt = layer(src,
+                                tgt,
+                                src_mask,
+                                tgt_mask,
+                                src_pos,
+                                tgt_pos)
+                if self.return_intermediate:
+                    src_intermediate.append(self.norm(src) if self.norm is not None else src)
+                    tgt_intermediate.append(self.norm(tgt) if self.norm is not None else tgt)
+                    
+        else:
+            for layer in self.layers:
+                src, tgt = layer(src, tgt, src_mask=src_mask, tgt_mask=tgt_mask,
+                                src_key_padding_mask=src_key_padding_mask,
+                                tgt_key_padding_mask=tgt_key_padding_mask,
+                                src_pos=src_pos, tgt_pos=tgt_pos)
+                if self.return_intermediate:
+                    src_intermediate.append(self.norm(src) if self.norm is not None else src)
+                    tgt_intermediate.append(self.norm(tgt) if self.norm is not None else tgt)
 
         if self.norm is not None:
             src = self.norm(src)

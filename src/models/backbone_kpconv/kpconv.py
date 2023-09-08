@@ -72,6 +72,7 @@ class KPFEncoder(torch.nn.Module):
                                                      out_dim,
                                                      octave,
                                                      config, True, False))
+                print("config.use_att_in_backbone:", config.use_cross_att)
             elif i in i_block and config.use_cross_att:
                 self.encoder_blocks.append(block_decider(block,
                                                      r,

@@ -196,7 +196,7 @@ class GeometricTransformer(nn.Module):
         ref_feats = self.out_proj(ref_feats)
         src_feats = self.out_proj(src_feats)
 
-        return ref_feats, src_feats
+        return src_feats, ref_feats
 
 
 def _check_block_type(block):

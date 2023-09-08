@@ -51,7 +51,7 @@ class RegTR(GenericRegModel):
         #######################
         self.use_geo = cfg.use_geotransformer
         if cfg.use_geotransformer:
-            self.transformer_encoder = GeometricTransformer(
+            encoder_layer = GeometricTransformer(
             cfg.d_embed,
             cfg.geotransformer_output_dim,
             cfg.geotransformer_hidden_dim,
@@ -66,6 +66,12 @@ class RegTR(GenericRegModel):
             print("using geo!!")
             print("using geo!!")
             print("using geo!!")
+            
+            encoder_norm = nn.LayerNorm(cfg.d_embed) if cfg.pre_norm else None
+            self.transformer_encoder = TransformerCrossEncoder(
+                encoder_layer, cfg.num_encoder_layers, encoder_norm,
+                return_intermediate=True,use_geo=True)
+            
         else:
             encoder_layer = TransformerCrossEncoderLayer(
                 cfg.d_embed, cfg.nhead, cfg.d_feedforward, cfg.dropout,
@@ -201,16 +207,16 @@ class RegTR(GenericRegModel):
             tgt_xyz_c_tmp,
             src_feats_padded,
             tgt_feats_padded,
-            src_xyz_c_padding_mask,
-            tgt_xyz_c_padding_mask
+            src_key_padding_mask,
+            tgt_key_padding_mask
         )
             src_feats_padded = src_feats_padded.transpose(0,1)
             tgt_feats_padded = tgt_feats_padded.transpose(0,1)
             
             # print("src_feats_cond.shape: ",src_feats_cond.shape)
             
-            src_feats_cond = src_feats_cond.transpose(0,1).unsqueeze(0).expand(6, -1, -1, -1)
-            tgt_feats_cond = tgt_feats_cond.transpose(0,1).unsqueeze(0).expand(6, -1, -1, -1)
+            # src_feats_cond = src_feats_cond.transpose(0,1).unsqueeze(0).expand(6, -1, -1, -1)
+            # tgt_feats_cond = tgt_feats_cond.transpose(0,1).unsqueeze(0).expand(6, -1, -1, -1)
             
             # print("src_feats_cond.shape: ",src_feats_cond.shape)
             
