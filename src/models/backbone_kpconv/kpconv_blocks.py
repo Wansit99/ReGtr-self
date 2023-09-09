@@ -27,6 +27,10 @@ from torch.nn.parameter import Parameter
 from torch.nn.init import kaiming_uniform_
 
 from .kernels.kernel_points import load_kernels
+from models.transformer.pos_emb import PositionEmbeddingSelf
+from utils.seq_manipulation import split_src_tgt, pad_sequence
+from typing import Optional
+from torch import Tensor
 
 _logger = logging.getLogger(__name__)
 
@@ -738,17 +742,32 @@ class ResnetBottleneckBlock(nn.Module):
             # self.linear1 = nn.Linear(out_dim, out_dim)
             self.linear2 = nn.Linear(out_dim, out_dim)
             self.linear5 = nn.Linear(out_dim, out_dim)
+            self.linear6 = nn.Linear(out_dim, out_dim)
             self.linear3 = nn.Linear(out_dim, out_dim//2)
             self.linear4 = nn.Linear(out_dim//2, out_dim)
 
             self.drop1 = nn.Dropout(0.1)
             self.drop2 = nn.Dropout(0.1)
+            print("using self-att in backbone!!")
         else:
             self.attention = None
 
-            
+        if config.use_self_emd:
+            self.pos_embed = PositionEmbeddingSelf(out_dim)
+            print("using PositionEmbeddingSelf!!")
+            print("using PositionEmbeddingSelf!!")
+            print("using PositionEmbeddingSelf!!")
+            print("using PositionEmbeddingSelf!!")
+            self.use_self_emd = True
+        else:
+            self.use_self_emd = False
         return
-
+    
+    def with_pos_embed(self, tensor, pos: Optional[Tensor]):
+        # print(tensor.shape)
+        # print(pos.shape)
+        return tensor if pos is None else tensor + pos
+    
     def forward(self, features, batch):
 
         stack_lengths_pre = batch['stack_lengths'][self.layer_ind]
@@ -787,11 +806,31 @@ class ResnetBottleneckBlock(nn.Module):
         if self.use_att:
             x = self.leaky_relu(x + shortcut)
             # x_linear = self.relu(self.layernorm1(self.linear1(x)))
+            if self.use_self_emd:
+                    
+                slens = [s.tolist() for s in batch['stack_lengths']]
+                slens_c = slens[0]
+                src_xyz_c, tgt_xyz_c = split_src_tgt(batch['points'][self.layer_ind], stack_lengths_post)
+                src_xyz_nei_indx, tgt_xyz_nei_indx = split_src_tgt(neighb_inds, stack_lengths_post)
+                src_xyz_c_all, tgt_xyz_c_all = split_src_tgt(batch['points'][0], slens_c)
+                src_pe = self.pos_embed(src_xyz_c, src_xyz_nei_indx, batch['points'][0], batch['points'][self.layer_ind])
+                tgt_pe = self.pos_embed(tgt_xyz_c, tgt_xyz_nei_indx, batch['points'][0], batch['points'][self.layer_ind])
+
+                pos = []
+                # feats的顺序是src1,src2,sr3....tgt1,tgt2,tgt3
+                for i in range(len(src_pe)):
+                    pos.append(src_pe[i])
+                for i in range(len(tgt_pe)):
+                    pos.append(tgt_pe[i])
+
+                all_pe_padded = torch.cat(pos, dim=0)
+
+                x = self.with_pos_embed(x, all_pe_padded)
 
             attn_output, _ = self.attention(x, x, x)
             attn_output = self.layernorm2(
                 (self.drop1(self.linear5(self.linear2((attn_output)))))*(1-self.sigmoid(self.k1)) 
-                + (self.sigmoid(self.k1))*self.linear5(x))
+                + (self.sigmoid(self.k1))*self.linear6(x))
             attn_layer = self.gelu(self.linear3(attn_output))
             attn_layer = self.drop2(self.linear4(attn_layer)) + attn_output
             return self.layernorm3(attn_layer)
@@ -804,6 +843,37 @@ class ResnetBottleneckBlock(nn.Module):
             global_x, _ = self.attention(local_x, local_x, local_x)
             
             # 分别得到各自交叉注意力之后的局部，全局特征
+            
+            if self.use_self_emd:
+                slens = [s.tolist() for s in batch['stack_lengths']]
+                slens_c = slens[0]
+                src_xyz_c, tgt_xyz_c = split_src_tgt(batch['points'][self.layer_ind], stack_lengths_post)
+                src_xyz_nei_indx, tgt_xyz_nei_indx = split_src_tgt(batch['neighbors'][self.layer_ind], stack_lengths_post)
+                src_xyz_c_all, tgt_xyz_c_all = split_src_tgt(batch['points'][0], slens_c)
+                # print("src_xyz_c_all.shape[0]:" , src_xyz_c_all[0].shape)
+                # print("src_xyz_nei_indx[1].shape:" , src_xyz_nei_indx[1].shape)
+                # print("src_xyz_c_all[1].shape:" , src_xyz_c[1].shape)
+                # print("stack_lengths_post:", stack_lengths_post)
+                src_pe = self.pos_embed(src_xyz_c, src_xyz_nei_indx, src_xyz_c_all)
+                tgt_pe = self.pos_embed(tgt_xyz_c, tgt_xyz_nei_indx, tgt_xyz_c_all)
+                src_pe_padded, _, _ = pad_sequence(src_pe)
+                tgt_pe_padded, _, _ = pad_sequence(tgt_pe)
+                
+                pos = []
+                for i in range(len(src_pe)):
+                    pos.append(src_pe[i])
+                    pos.append(tgt_pe[i])
+                
+                all_pe_padded = torch.cat(pos, dim=0)
+                # print("all_pe_padded.shape: ", all_pe_padded.shape)
+                # print("tgt_pe_padded.shape: ", tgt_pe_padded.shape )
+                
+                # print(global_x.shape)
+                # print(all_pe_padded.shape)
+                global_x = self.with_pos_embed(global_x, all_pe_padded)
+                local_x = self.with_pos_embed(local_x, all_pe_padded)
+                
+                
             
             global_x_new, xatt_weights_s = self.multihead_attn(query=global_x,
                                                    key=local_x,

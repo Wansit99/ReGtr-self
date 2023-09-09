@@ -20,7 +20,7 @@ class PositionEmbeddingSelf(nn.Module):
         self.mlp = nn.Linear(10, d_model)
         
 
-    def forward(self, points_xyz, index, all_points_xyz):
+    def forward(self, points_xyz, index, all_points_xyz, now_points_xyz):
         pos_emd = []
         B = len(points_xyz)
         
@@ -31,13 +31,18 @@ class PositionEmbeddingSelf(nn.Module):
             index_tmp = index[i] # N, k
             # 得到当前批次的原始点的邻居的x,y,z
             # print("index_tmp.shape:", index_tmp.shape)
+            # print("points.shape:", points.shape)
             # print("index_tmp.dtype:", index_tmp.dtype)
-            # print(all_points_xyz.shape)
-            # print(index_tmp.max())
-            points_neig_xyz = all_points_xyz[i][index_tmp] # N, K, 3
             # print("all_points_xyz[i].shape:", all_points_xyz[i].shape)
-            # print("index_tmp.shape:", index_tmp.shape)
-            # print("points_neig_xyz.shape:", points_neig_xyz.shape)
+            # print("index_tmp.max(): ", index_tmp.max())
+            
+            # 判断哪些index越界 即不存在这个邻居
+            above_max = index_tmp >= len(now_points_xyz)
+       
+            clamped_indices = above_max # N, K
+            index_tmp = torch.clamp(index_tmp, 0, len(now_points_xyz)-1)  # N, K, 3
+            points_neig_xyz = all_points_xyz[index_tmp] # N, K, 3
+   
             # 得到N,K
             N, K, _ = points_neig_xyz.shape
             # 将原始点的x,y,z复制k次
@@ -50,6 +55,10 @@ class PositionEmbeddingSelf(nn.Module):
             all_feats = torch.cat([expanded_points, points_neig_xyz, Point_i, distance], dim=-1) # N, K, 10
             # 将其转换为N, K, d
             transformed_tensor = self.mlp(all_feats)
+        
+            # 得到对应的mask N, K, d
+            clamped_indices_expanded = clamped_indices.unsqueeze(-1).expand_as(transformed_tensor)
+            transformed_tensor[clamped_indices_expanded] = float("-inf")
             # 在第2个维度做max，得到N，1，d
             final_tensor, _ = transformed_tensor.max(1)
             # 加入到list中
