@@ -39,6 +39,7 @@ class RegTR(GenericRegModel):
         #######################
         # Embeddings
         #######################
+        cfg.use_self_emd = False
         if cfg.use_self_emd:
             self.pos_embed = PositionEmbeddingSelf(cfg.d_embed)
             print("using use_self_emd!!")
@@ -182,12 +183,15 @@ class RegTR(GenericRegModel):
 
         # Position embedding for downsampled points
         if self.use_self_emd:
+            
+            slens = [s.tolist() for s in kpconv_meta['stack_lengths']]
+            slens_c = slens[-1]
             src_xyz_c, tgt_xyz_c = split_src_tgt(kpconv_meta['points'][-1], slens_c)
             src_xyz_nei_indx, tgt_xyz_nei_indx = split_src_tgt(kpconv_meta['neighbors'][-1], slens_c)
-            src_xyz_c_all, tgt_xyz_c_all = split_src_tgt(kpconv_meta['points'][0], slens[0])
+            # src_xyz_c_all, tgt_xyz_c_all = split_src_tgt(batch['points'][0], slens_c)
+            src_pe = self.pos_embed(src_xyz_c, src_xyz_nei_indx, kpconv_meta['points'][0], kpconv_meta['points'][-1])
+            tgt_pe = self.pos_embed(tgt_xyz_c, tgt_xyz_nei_indx, kpconv_meta['points'][0], kpconv_meta['points'][-1])
             
-            src_pe = self.pos_embed(src_xyz_c, src_xyz_nei_indx, src_xyz_c_all)
-            tgt_pe = self.pos_embed(tgt_xyz_c, tgt_xyz_nei_indx, tgt_xyz_c_all)
             src_pe_padded, _, _ = pad_sequence(src_pe)
             tgt_pe_padded, _, _ = pad_sequence(tgt_pe)
             

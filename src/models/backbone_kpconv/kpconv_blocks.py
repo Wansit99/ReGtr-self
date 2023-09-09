@@ -812,7 +812,7 @@ class ResnetBottleneckBlock(nn.Module):
                 slens_c = slens[0]
                 src_xyz_c, tgt_xyz_c = split_src_tgt(batch['points'][self.layer_ind], stack_lengths_post)
                 src_xyz_nei_indx, tgt_xyz_nei_indx = split_src_tgt(neighb_inds, stack_lengths_post)
-                src_xyz_c_all, tgt_xyz_c_all = split_src_tgt(batch['points'][0], slens_c)
+                # src_xyz_c_all, tgt_xyz_c_all = split_src_tgt(batch['points'][0], slens_c)
                 src_pe = self.pos_embed(src_xyz_c, src_xyz_nei_indx, batch['points'][0], batch['points'][self.layer_ind])
                 tgt_pe = self.pos_embed(tgt_xyz_c, tgt_xyz_nei_indx, batch['points'][0], batch['points'][self.layer_ind])
 
