@@ -189,8 +189,8 @@ class RegTR(GenericRegModel):
             src_xyz_c, tgt_xyz_c = split_src_tgt(kpconv_meta['points'][-1], slens_c)
             src_xyz_nei_indx, tgt_xyz_nei_indx = split_src_tgt(kpconv_meta['neighbors'][-1], slens_c)
             # src_xyz_c_all, tgt_xyz_c_all = split_src_tgt(batch['points'][0], slens_c)
-            src_pe = self.pos_embed(src_xyz_c, src_xyz_nei_indx, kpconv_meta['points'][0], kpconv_meta['points'][-1])
-            tgt_pe = self.pos_embed(tgt_xyz_c, tgt_xyz_nei_indx, kpconv_meta['points'][0], kpconv_meta['points'][-1])
+            src_pe, src_feats_10 = self.pos_embed(src_xyz_c, src_xyz_nei_indx, kpconv_meta['points'][0], kpconv_meta['points'][-1])
+            tgt_pe, tgt_feats_10 = self.pos_embed(tgt_xyz_c, tgt_xyz_nei_indx, kpconv_meta['points'][0], kpconv_meta['points'][-1])
             
             src_pe_padded, _, _ = pad_sequence(src_pe)
             tgt_pe_padded, _, _ = pad_sequence(tgt_pe)

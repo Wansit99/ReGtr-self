@@ -22,6 +22,7 @@ class PositionEmbeddingSelf(nn.Module):
 
     def forward(self, points_xyz, index, all_points_xyz, now_points_xyz):
         pos_emd = []
+        pos_ten = []
         B = len(points_xyz)
         
         for i in range(B):
@@ -59,12 +60,19 @@ class PositionEmbeddingSelf(nn.Module):
             # 得到对应的mask N, K, d
             clamped_indices_expanded = clamped_indices.unsqueeze(-1).expand_as(transformed_tensor)
             transformed_tensor[clamped_indices_expanded] = float("-inf")
-            # 在第2个维度做max，得到N，1，d
+            # 在第2个维度做max，得到N，d
             final_tensor, _ = transformed_tensor.max(1)
             # 加入到list中
             pos_emd.append(final_tensor)
+            
+            # 得到对应的mask N, K, d
+            clamped_indices_expanded = clamped_indices.unsqueeze(-1).expand_as(all_feats)
+            all_feats[clamped_indices_expanded] = float("-inf")
+            # 在第2个维度做max，得到N，10
+            all_feats, _ = all_feats.max(1)
+            pos_ten.append(all_feats)
 
-        return pos_emd
+        return pos_emd, all_feats
 
 # 测试代码
 if __name__ == '__main__':
