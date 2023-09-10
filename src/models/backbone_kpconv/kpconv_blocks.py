@@ -813,13 +813,14 @@ class ResnetBottleneckBlock(nn.Module):
                 src_xyz_c, tgt_xyz_c = split_src_tgt(batch['points'][self.layer_ind], stack_lengths_post)
                 src_xyz_nei_indx, tgt_xyz_nei_indx = split_src_tgt(neighb_inds, stack_lengths_post)
                 # src_xyz_c_all, tgt_xyz_c_all = split_src_tgt(batch['points'][0], slens_c)
-                src_pe = self.pos_embed(src_xyz_c, src_xyz_nei_indx, batch['points'][0], batch['points'][self.layer_ind])
-                tgt_pe = self.pos_embed(tgt_xyz_c, tgt_xyz_nei_indx, batch['points'][0], batch['points'][self.layer_ind])
+                src_pe, src_pe_10 = self.pos_embed(src_xyz_c, src_xyz_nei_indx, batch['points'][0], batch['points'][self.layer_ind])
+                tgt_pe, tgt_pe_10 = self.pos_embed(tgt_xyz_c, tgt_xyz_nei_indx, batch['points'][0], batch['points'][self.layer_ind])
 
                 pos = []
                 # feats的顺序是src1,src2,sr3....tgt1,tgt2,tgt3
                 for i in range(len(src_pe)):
                     pos.append(src_pe[i])
+                    # print(src_pe[i].dtype)
                 for i in range(len(tgt_pe)):
                     pos.append(tgt_pe[i])
 
