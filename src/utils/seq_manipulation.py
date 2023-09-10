@@ -46,3 +46,19 @@ def split_src_tgt(feats, stack_lengths, dim=0):
     B = len(stack_lengths) // 2
     separate = torch.split(feats, stack_lengths, dim=dim)
     return separate[:B], separate[B:]
+
+
+def split_src_tgt_self(feats, stack_lengths, dim=0):
+    if isinstance(stack_lengths, torch.Tensor):
+        stack_lengths = stack_lengths.tolist()
+
+    # 获取stack_lengths的一半长度
+    half_len = len(stack_lengths) // 2
+
+    # 使用stack_lengths将feats分割
+    separate = torch.split(feats, stack_lengths, dim=dim)
+
+    # 根据stack_lengths的前一半和后一半重新组合数据
+    combined = [torch.cat([separate[i], separate[i + half_len]], dim=dim) for i in range(half_len)]
+
+    return combined

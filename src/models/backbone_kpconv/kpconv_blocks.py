@@ -28,7 +28,7 @@ from torch.nn.init import kaiming_uniform_
 
 from .kernels.kernel_points import load_kernels
 from models.transformer.pos_emb import PositionEmbeddingSelf
-from utils.seq_manipulation import split_src_tgt, pad_sequence
+from utils.seq_manipulation import split_src_tgt, pad_sequence, split_src_tgt_self, combine_src_tgt
 from typing import Optional
 from torch import Tensor
 
@@ -755,9 +755,6 @@ class ResnetBottleneckBlock(nn.Module):
         if config.use_self_emd:
             self.pos_embed = PositionEmbeddingSelf(out_dim)
             print("using PositionEmbeddingSelf!!")
-            print("using PositionEmbeddingSelf!!")
-            print("using PositionEmbeddingSelf!!")
-            print("using PositionEmbeddingSelf!!")
             self.use_self_emd = True
         else:
             self.use_self_emd = False
@@ -823,18 +820,49 @@ class ResnetBottleneckBlock(nn.Module):
                     # print(src_pe[i].dtype)
                 for i in range(len(tgt_pe)):
                     pos.append(tgt_pe[i])
-
+                
                 all_pe_padded = torch.cat(pos, dim=0)
-
+                
+                # print("pos.shape: ", pos.shape)
+                # print("stack_lengths_post: ", stack_lengths_post)
                 x = self.with_pos_embed(x, all_pe_padded)
-
-            attn_output, _ = self.attention(x, x, x)
-            attn_output = self.layernorm2(
-                (self.drop1(self.linear5(self.linear2((attn_output)))))*(1-self.sigmoid(self.k1)) 
-                + (self.sigmoid(self.k1))*self.linear6(x))
-            attn_layer = self.gelu(self.linear3(attn_output))
-            attn_layer = self.drop2(self.linear4(attn_layer)) + attn_output
-            return self.layernorm3(attn_layer)
+            
+            
+            # print("stack_lengths_post: ", stack_lengths_post)
+            # print("x[0].shape: ", x[0].shape)
+            # print("x[1].shape: ", x[1].shape)
+            # print("x[0].shape: ", x.shape)
+            # print("src_xyz_c.shape: ", src_xyz_c.shape)
+            # print("tgt_xyz_c.shape: ", tgt_xyz_c.shape)
+            new_x = split_src_tgt_self(x, stack_lengths_post)
+            # print(len(new_x))
+            # print(print("new_x[0].shape: ", new_x[0].shape))
+            # print(print("new_x[1].shape: ", new_x[1].shape))
+            
+            
+            B = len(stack_lengths_post) // 2
+            
+            all_attn_outputs = []
+            
+            for i in range(B):
+                x = new_x[i]
+                attn_output, _ = self.attention(x, x, x)
+                attn_output = self.layernorm2(
+                    (self.drop1(self.linear5(self.linear2((attn_output)))))*(1-self.sigmoid(self.k1)) 
+                    + (self.sigmoid(self.k1))*self.linear6(x))
+                attn_layer = self.gelu(self.linear3(attn_output))
+                attn_layer = self.drop2(self.linear4(attn_layer)) + attn_output
+                all_attn_outputs.append(self.layernorm3(attn_layer))
+                
+            
+            # attn_output, _ = self.attention(x, x, x)
+            # attn_output = self.layernorm2(
+            #     (self.drop1(self.linear5(self.linear2((attn_output)))))*(1-self.sigmoid(self.k1)) 
+            #     + (self.sigmoid(self.k1))*self.linear6(x))
+            # attn_layer = self.gelu(self.linear3(attn_output))
+            # attn_layer = self.drop2(self.linear4(attn_layer)) + attn_output
+            
+            return combine_src_tgt(all_attn_outputs, stack_lengths_post)
         
         if self.use_att_cross:
             # 得到local特征
