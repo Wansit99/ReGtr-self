@@ -54,9 +54,10 @@ class PositionEmbeddingSelf(nn.Module):
             distance = torch.norm(expanded_points - points_neig_xyz, dim=-1, keepdim=True) # N, K, 1
             # 将他们cat在一起
             all_feats = torch.cat([expanded_points, points_neig_xyz, Point_i, distance], dim=-1) # N, K, 10
+            
+            
             # 将其转换为N, K, d
             transformed_tensor = self.mlp(all_feats)
-        
             # 得到对应的mask N, K, d
             clamped_indices_expanded = clamped_indices.unsqueeze(-1).expand_as(transformed_tensor)
             transformed_tensor[clamped_indices_expanded] = float("-inf")
@@ -66,11 +67,12 @@ class PositionEmbeddingSelf(nn.Module):
             pos_emd.append(final_tensor)
             
             # 得到对应的mask N, K, d
-            clamped_indices_expanded = clamped_indices.unsqueeze(-1).expand_as(all_feats)
-            all_feats[clamped_indices_expanded] = float("-inf")
+            clamped_indices_all_feats_expanded = clamped_indices.unsqueeze(-1).expand_as(all_feats)
+            tmp_all_feats = all_feats.clone()
+            tmp_all_feats[clamped_indices_all_feats_expanded] = float("-inf")
             # 在第2个维度做max，得到N，10
-            all_feats, _ = all_feats.max(1)
-            pos_ten.append(all_feats)
+            all_feats_10, _ = tmp_all_feats.max(1)
+            pos_ten.append(all_feats_10)
 
         return pos_emd, all_feats
 
