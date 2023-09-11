@@ -1,6 +1,7 @@
 """Functions to manipulate sequences, e.g. packing/padding"""
 import torch
 import torch.nn as nn
+from typing import List
 
 
 def pad_sequence(sequences, require_padding_mask=False, require_lens=False,
@@ -62,3 +63,20 @@ def split_src_tgt_self(feats, stack_lengths, dim=0):
     combined = [torch.cat([separate[i], separate[i + half_len]], dim=dim) for i in range(half_len)]
 
     return combined
+
+def combine_src_tgt(combined_list: List[torch.Tensor], stack_lengths: List[int]) -> torch.Tensor:
+    if isinstance(stack_lengths, torch.Tensor):
+        stack_lengths = stack_lengths.tolist()
+
+    half_len = len(stack_lengths) // 2
+
+    src_tensors = []
+    tgt_tensors = []
+    for i in range(half_len):
+        # 根据stack_lengths将每个combined tensor分割成两部分
+        src_part, tgt_part = torch.split(combined_list[i], [stack_lengths[i], stack_lengths[i + half_len]], dim=0)
+        src_tensors.append(src_part)
+        tgt_tensors.append(tgt_part)
+
+    # 首先连接所有的src_part，然后连接所有的tgt_part
+    return torch.cat(src_tensors + tgt_tensors, dim=0)
