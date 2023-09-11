@@ -117,7 +117,9 @@ geotransformer:
     geotransformer_angle_k: 3
     geotransformer_reduction_a: 'max'
 
-
+# self_geo
+geotransformer_self:
+    use_geometry_self: True
 
 losses:
     # Overlap loss

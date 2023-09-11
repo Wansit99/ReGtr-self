@@ -228,6 +228,76 @@ class RPETransformerLayer(nn.Module):
         pos_states = self.pos_proj(pos_states)
         return output_states, attention_scores, pos_states
     
+    
+class AttentionLayer(nn.Module):
+    def __init__(self, d_model, num_heads, dropout=None):
+        super(AttentionLayer, self).__init__()
+        self.attention = MultiHeadAttention(d_model, num_heads, dropout=dropout)
+        self.linear = nn.Linear(d_model, d_model)
+        self.dropout = build_dropout_layer(dropout)
+        self.norm = nn.LayerNorm(d_model)
+
+    def forward(
+        self,
+        input_states,
+        memory_states,
+        input_pos,
+        memory_pos,
+        memory_weights=None,
+        memory_masks=None,
+        attention_factors=None,
+        attention_masks=None,
+    ):
+        hidden_states, attention_scores = self.attention(
+            input_states,
+            memory_states,
+            memory_states,
+            input_pos,
+            memory_pos,
+            key_weights=memory_weights,
+            key_masks=memory_masks,
+            attention_factors=attention_factors,
+            attention_masks=attention_masks,
+        )
+        hidden_states = self.linear(hidden_states)
+        hidden_states = self.dropout(hidden_states)
+        output_states = self.norm(hidden_states + input_states)
+        return output_states, attention_scores    
+    
+    
+    
+    
+# 交叉注意力模块
+class TransformerLayer(nn.Module):
+    def __init__(self, d_model, num_heads, dropout=None, activation_fn='ReLU'):
+        super(TransformerLayer, self).__init__()
+        self.attention = AttentionLayer(d_model, num_heads, dropout=dropout)
+        self.output = AttentionOutput(d_model, dropout=dropout, activation_fn=activation_fn)
+
+    def forward(
+        self,
+        input_states,
+        memory_states,
+        input_pos,
+        memory_pos,
+        memory_weights=None,
+        memory_masks=None,
+        attention_factors=None,
+        attention_masks=None,
+    ):
+        hidden_states, attention_scores = self.attention(
+            input_states,
+            memory_states,
+            input_pos,
+            memory_pos,
+            memory_weights=memory_weights,
+            memory_masks=memory_masks,
+            attention_factors=attention_factors,
+            attention_masks=attention_masks,
+        )
+        output_states = self.output(hidden_states)
+        return output_states, attention_scores    
+    
 if __name__ == '__main__':
     self_att = RPEAttentionLayer(256, 4)
     
@@ -236,5 +306,10 @@ if __name__ == '__main__':
     pos_src = torch.rand(1, 100, 10)
     pos_tgt = torch.rand(1, 200, 10)
     
-    src, scores, pos = self_att(src, src, pos_src)
+    feats0, scores0, pos0 = self_att(src, src, pos_src)
+    feats1, scores1, pos1 = self_att(tgt, tgt, pos_tgt)
+    # 交叉注意力
+    cross_att = TransformerLayer(256, 4)
+    feats0, scores0 = cross_att(feats0, feats1, pos0, pos1)
+    feats1, scores1 = cross_att(feats1, feats0, pos1, pos0)
     

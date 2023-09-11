@@ -14,6 +14,9 @@ from models.transformer.position_embedding import PositionEmbeddingCoordsSine, \
 from models.transformer.pos_emb import PositionEmbeddingSelf
 from models.transformer.transformers import \
     TransformerCrossEncoderLayer, TransformerCrossEncoder
+    
+from models.transformer.transformers_self import \
+    TransformerCrossEncoderLayer_self, TransformerCrossEncoder_self
 from utils.se3_torch import compute_rigid_transform, se3_transform_list, se3_inv
 from utils.seq_manipulation import split_src_tgt, pad_sequence, unpad_sequences
 from utils.viz import visualize_registration
@@ -39,7 +42,7 @@ class RegTR(GenericRegModel):
         #######################
         # Embeddings
         #######################
-        cfg.use_self_emd = False
+        # cfg.use_self_emd = False
         if cfg.use_self_emd:
             self.pos_embed = PositionEmbeddingSelf(cfg.d_embed)
             print("using use_self_emd!!")
@@ -59,6 +62,7 @@ class RegTR(GenericRegModel):
         # Attention propagation
         #######################
         self.use_geo = cfg.use_geotransformer
+        self.use_geometry_self = cfg.use_geometry_self
         if cfg.use_geotransformer:
             encoder_layer = GeometricTransformer(
             cfg.d_embed,
@@ -78,6 +82,21 @@ class RegTR(GenericRegModel):
             
             encoder_norm = nn.LayerNorm(cfg.d_embed) if cfg.pre_norm else None
             self.transformer_encoder = TransformerCrossEncoder(
+                encoder_layer, cfg.num_encoder_layers, encoder_norm,
+                return_intermediate=True,use_geo=True)
+
+        elif cfg.use_geometry_self:
+            encoder_layer = TransformerCrossEncoderLayer_self(
+            cfg.d_embed,
+            cfg.self_head,
+        )
+            print("using geo-self!!")
+            print("using geo-self!!")
+            print("using geo-self!!")
+            print("using geo-self!!")
+            
+            encoder_norm = nn.LayerNorm(cfg.d_embed) if cfg.pre_norm else None
+            self.transformer_encoder = TransformerCrossEncoder_self(
                 encoder_layer, cfg.num_encoder_layers, encoder_norm,
                 return_intermediate=True,use_geo=True)
             
@@ -182,6 +201,11 @@ class RegTR(GenericRegModel):
         src_feats_un, tgt_feats_un = split_src_tgt(both_feats_un, slens_c)
 
         # Position embedding for downsampled points
+        
+        src_feats_10_tmp = None
+        tgt_feats_10_tmp = None
+        
+        
         if self.use_self_emd:
             
             slens = [s.tolist() for s in kpconv_meta['stack_lengths']]
@@ -191,6 +215,9 @@ class RegTR(GenericRegModel):
             # src_xyz_c_all, tgt_xyz_c_all = split_src_tgt(batch['points'][0], slens_c)
             src_pe, src_feats_10 = self.pos_embed(src_xyz_c, src_xyz_nei_indx, kpconv_meta['points'][0], kpconv_meta['points'][-1])
             tgt_pe, tgt_feats_10 = self.pos_embed(tgt_xyz_c, tgt_xyz_nei_indx, kpconv_meta['points'][0], kpconv_meta['points'][-1])
+            
+            src_feats_10_tmp = src_feats_10
+            tgt_feats_10_tmp = tgt_feats_10
             
             src_pe_padded, _, _ = pad_sequence(src_pe)
             tgt_pe_padded, _, _ = pad_sequence(tgt_pe)
@@ -244,7 +271,34 @@ class RegTR(GenericRegModel):
             # tgt_feats_cond = tgt_feats_cond.transpose(0,1).unsqueeze(0).expand(6, -1, -1, -1)
             
             # print("src_feats_cond.shape: ",src_feats_cond.shape)
+        elif self.use_geometry_self:
+            # src_xyz_c_tmp = src_xyz_c_padded.transpose(0,1)
+            # tgt_xyz_c_tmp = tgt_xyz_c_padded.transpose(0,1)
             
+            src_feats_padded = src_feats_padded.transpose(0,1)
+            tgt_feats_padded = tgt_feats_padded.transpose(0,1)
+            
+            src_feats_10_tmp_padded, _, _ = pad_sequence(src_feats_10_tmp)
+            tgt_feats_10_tmp_padded, _, _ = pad_sequence(tgt_feats_10_tmp)
+            
+            src_feats_10_tmp_padded = src_feats_10_tmp_padded.transpose(0,1)
+            tgt_feats_10_tmp_padded = tgt_feats_10_tmp_padded.transpose(0,1)
+            
+            
+            src_feats_cond, tgt_feats_cond = self.transformer_encoder(
+            src_feats_padded,
+            tgt_feats_padded,
+            src_feats_10_tmp_padded,
+            tgt_feats_10_tmp_padded,
+            src_key_padding_mask,
+            tgt_key_padding_mask
+        )
+            src_feats_padded = src_feats_padded.transpose(0,1)
+            tgt_feats_padded = tgt_feats_padded.transpose(0,1)
+            
+            src_feats_cond = src_feats_cond.transpose(1,2)
+            tgt_feats_cond = tgt_feats_cond.transpose(1,2)
+           
         else:
             src_feats_cond, tgt_feats_cond = self.transformer_encoder(
                 src_feats_padded, tgt_feats_padded,
