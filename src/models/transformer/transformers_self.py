@@ -102,8 +102,8 @@ class TransformerCrossEncoderLayer_self(nn.Module):
 
         # Self, cross attention layers
         if attention_type == 'dot_prod':
-            self.self_attn = RPEAttentionLayer(d_model, nhead, dropout=dropout, activation_fn=activation_fn)
-            self.cross_attn = TransformerLayer(d_model, nhead, dropout=dropout, activation_fn=activation_fn)
+            self.self_attn = RPEAttentionLayer(d_model, nhead, dropout=dropout)
+            self.cross_attn = TransformerLayer(d_model, nhead, dropout=dropout)
         else:
             raise NotImplementedError
 

@@ -1,4 +1,4 @@
-from factory import build_dropout_layer, build_act_layer
+from models.transformer.factory import build_dropout_layer, build_act_layer
 import torch.nn as nn
 from einops import rearrange
 import torch

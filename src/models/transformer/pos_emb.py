@@ -74,7 +74,7 @@ class PositionEmbeddingSelf(nn.Module):
             all_feats_10, _ = tmp_all_feats.max(1)
             pos_ten.append(all_feats_10)
 
-        return pos_emd, all_feats
+        return pos_emd, pos_ten
 
 # 测试代码
 if __name__ == '__main__':
