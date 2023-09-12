@@ -119,6 +119,9 @@ class RegTR(GenericRegModel):
         #######################
         if cfg.get('direct_regress_coor', False):
             self.correspondence_decoder = CorrespondenceRegressor(cfg.d_embed)
+            print("using CorrespondenceRegressor!!")
+            print("using CorrespondenceRegressor!!")
+            print("using CorrespondenceRegressor!!")
         else:
             self.correspondence_decoder = CorrespondenceDecoder(cfg.d_embed,
                                                                 cfg.corr_decoder_has_pos_emb,
@@ -544,14 +547,36 @@ class CorrespondenceRegressor(nn.Module):
     def __init__(self, d_embed):
         super().__init__()
 
-        self.coor_mlp = nn.Sequential(
-            nn.Linear(d_embed, d_embed),
+        self.coor_mlp1 = nn.Sequential(
+            nn.Linear(d_embed+3, d_embed),
             nn.ReLU(),
             nn.Linear(d_embed, d_embed),
             nn.ReLU(),
-            nn.Linear(d_embed, 3)
+            nn.Linear(d_embed, 5)
         )
-        self.conf_logits_decoder = nn.Linear(d_embed, 1)
+        # self.conf_logits_decoder = nn.Linear(d_embed, 1)
+        
+        
+        self.coor_mlp2 = nn.Sequential(
+            nn.Linear(d_embed+3, d_embed//2),
+            nn.ReLU(),
+            nn.Linear(d_embed//2, d_embed),
+            nn.ReLU(),
+            nn.Linear(d_embed, 5)
+        )
+        # self.conf_logits_decoder = nn.Linear(d_embed, 1)
+        
+        
+        self.coor_mlp3 = nn.Sequential(
+            nn.Linear(d_embed+3, d_embed*2),
+            nn.ReLU(),
+            nn.Linear(d_embed*2, d_embed),
+            nn.ReLU(),
+            nn.Linear(d_embed, 5)
+        )
+        
+        self.total = nn.Linear(9, 3),
+        # self.conf_logits_decoder = nn.Linear(d_embed, 1)
 
     def forward(self, src_feats_padded, tgt_feats_padded, src_xyz, tgt_xyz):
         """
@@ -570,17 +595,67 @@ class CorrespondenceRegressor(nn.Module):
             pad_sequence(src_xyz, require_padding_mask=True, require_lens=True)
         tgt_xyz_padded, tgt_key_padding_mask, tgt_lens = \
             pad_sequence(tgt_xyz, require_padding_mask=True, require_lens=True)
+        
+        
+        # 调整第二个张量的形状
+        src_xyz_padded_ = src_xyz_padded.unsqueeze(0).expand(4, -1, -1, -1)  # 扩展成与src_feats_padded相同的形状
+         # 调整第二个张量的形状
+        tgt_xyz_padded_ = tgt_xyz_padded.unsqueeze(0).expand(4, -1, -1, -1)  # 扩展成与tgt_feats_padded相同的形状
 
+        # 使用 torch.cat 将它们连接在一起
+        src_feats_padded_ = torch.cat((src_xyz_padded_, src_feats_padded), dim=-1)  # 在最后一个维度上连接
+        
+        # 使用 torch.cat 将它们连接在一起
+        tgt_feats_padded_ = torch.cat((tgt_xyz_padded_, tgt_feats_padded), dim=-1)  # 在最后一个维度上连接
+        
+        
         # Decode the coordinates
-        src_corr = self.coor_mlp(src_feats_padded)
-        tgt_corr = self.coor_mlp(tgt_feats_padded)
+        src_corr1 = self.coor_mlp1(src_feats_padded_)
+        tgt_corr1 = self.coor_mlp1(tgt_feats_padded_)
+        
+        src_corr2 = self.coor_mlp2(src_feats_padded_)
+        tgt_corr2 = self.coor_mlp2(tgt_feats_padded_)
+        
+        src_corr3 = self.coor_mlp3(src_feats_padded_)
+        tgt_corr3 = self.coor_mlp3(tgt_feats_padded_)
+        
+        
+        src_weight1 = torch.sigmoid(src_corr1[...,4:])
+        tgt_weight1 = torch.sigmoid(tgt_corr1[...,4:])
+        src_weight2 = torch.sigmoid(src_corr2[...,4:])
+        tgt_weight2 = torch.sigmoid(tgt_corr2[...,4:])
+        src_weight3 = torch.sigmoid(src_corr3[...,4:])
+        tgt_weight3 = torch.sigmoid(tgt_corr3[...,4:])
+        
+        combined_src_weights = torch.cat((src_weight1, src_weight2, src_weight3), dim=-1)
+        # 在最后一个维度上应用 softmax
+        src_softmax_combined_weights = torch.softmax(combined_src_weights, dim=-1)
+        
+        combined_tgt_weights = torch.cat((tgt_weight1, tgt_weight2, tgt_weight3), dim=-1)
+        # 在最后一个维度上应用 softmax
+        tgt_softmax_combined_weights = torch.softmax(combined_tgt_weights, dim=-1)
+        
+        src_corr = (src_corr1*src_softmax_combined_weights[...,0].unsqueeze(-1) + src_corr2*src_softmax_combined_weights[...,1].unsqueeze(-1) + src_corr3*src_softmax_combined_weights[...,2].unsqueeze(-1))
+        tgt_corr = (tgt_corr1*tgt_softmax_combined_weights[...,0].unsqueeze(-1) + tgt_corr2*tgt_softmax_combined_weights[...,1].unsqueeze(-1) + tgt_corr3*tgt_softmax_combined_weights[...,2].unsqueeze(-1))
+    
+        
+        
+        src_overlap = src_corr[...,3:4]
+        tgt_overlap = tgt_corr[...,3:4]
+        
+        src_corr_ = src_corr[...,:3]
+        tgt_corr_ = tgt_corr[...,:3]
 
-        src_overlap = self.conf_logits_decoder(src_feats_padded)
-        tgt_overlap = self.conf_logits_decoder(tgt_feats_padded)
+        # src_overlap = self.conf_logits_decoder(src_feats_padded)
+        # tgt_overlap = self.conf_logits_decoder(tgt_feats_padded)
+        
+        
+        
 
-        src_corr_list = unpad_sequences(src_corr, src_lens)
-        tgt_corr_list = unpad_sequences(tgt_corr, tgt_lens)
+        src_corr_list = unpad_sequences(src_corr_, src_lens)
+        tgt_corr_list = unpad_sequences(tgt_corr_, tgt_lens)
         src_overlap_list = unpad_sequences(src_overlap, src_lens)
         tgt_overlap_list = unpad_sequences(tgt_overlap, tgt_lens)
 
         return src_corr_list, tgt_corr_list, src_overlap_list, tgt_overlap_list
+
